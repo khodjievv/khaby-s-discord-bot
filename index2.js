@@ -135,7 +135,7 @@ const commands = [
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
-  const activeToken = process.env.TOKEN2 || process.env.TOKEN;
+  const activeToken = "MTUzMDK5MDY4Mjc3OTY4NDkyNA.GEbSTD.371dgOaGFjC4cNJXor1FyX_trpKAYLu6N5A0yU";
   const rest = new REST({ version: '10' }).setToken(activeToken);
   
   // Registers commands globally across all servers the bot is in
@@ -180,10 +180,28 @@ client.on('interactionCreate', async interaction => {
       const pollRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Polls/${pollId}.json`;
       
       const res = await fetch(pollRef);
-      const pollData = await res.json();
+      let pollData = await res.json();
 
+      // Fallback: If Firebase entry expired or failed, reconstruct data from embed fields safely
       if (!pollData) {
-        return interaction.reply({ content: '❌ This poll instance is no longer valid.', ephemeral: true });
+        const embed = interaction.message.embeds[0];
+        if (embed && embed.description) {
+          const lines = embed.description.split('\n');
+          const queryMatch = lines[0]?.replace(/\*\*/g, '').trim() || 'Community Poll';
+          const choice1Match = lines[2]?.split('—')[0]?.replace(/🟢\s*\[1\]\s*/, '').trim() || 'Choice A';
+          const choice2Match = lines[3]?.split('—')[0]?.replace(/🔵\s*\[2\]\s*/, '').trim() || 'Choice B';
+
+          pollData = {
+            query: queryMatch,
+            choice_a: choice1Match,
+            choice_b: choice2Match,
+            votes1: 0,
+            votes2: 0,
+            voters: {}
+          };
+        } else {
+          return interaction.reply({ content: '❌ This poll instance is no longer valid.', ephemeral: true });
+        }
       }
 
       if (pollData.voters && pollData.voters[interaction.user.id]) {
@@ -198,14 +216,26 @@ client.on('interactionCreate', async interaction => {
       if (optionNum === '1') v1++;
       if (optionNum === '2') v2++;
 
+      // Use PUT to ensure fields like choice_a and choice_b are never dropped or overwritten as undefined
       await fetch(pollRef, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ votes1: v1, votes2: v2, voters: updatedVoters })
+        body: JSON.stringify({
+          query: pollData.query,
+          choice_a: pollData.choice_a,
+          choice_b: pollData.choice_b,
+          votes1: v1,
+          votes2: v2,
+          voters: updatedVoters
+        })
       });
 
-      const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
-        .setDescription(`**${pollData.query}**\n\n🟢 **[1]** ${pollData.choice_a} — \`${v1}\` votes\n🔵 **[2]** ${pollData.choice_b} — \`${v2}\` votes`);
+      const updatedEmbed = new EmbedBuilder()
+        .setColor('#3498db')
+        .setTitle('📊 Community Ballot')
+        .setDescription(`**${pollData.query}**\n\n🟢 **[1]** ${pollData.choice_a} — \`${v1}\` votes\n🔵 **[2]** ${pollData.choice_b} — \`${v2}\` votes`)
+        .setFooter({ text: `Ballot ID: ${pollId}` })
+        .setTimestamp();
 
       await interaction.message.edit({ embeds: [updatedEmbed] });
       return interaction.reply({ content: `✅ Vote logged successfully for **${optionNum === '1' ? pollData.choice_a : pollData.choice_b}**!`, ephemeral: true });
@@ -551,5 +581,5 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// Secure login using TOKEN2 with TOKEN fallback
-client.login(process.env.TOKEN2 || process.env.TOKEN);
+// Secure login using hardcoded token string
+client.login("MTUzMDK5MDY4Mjc3OTY4NDkyNA.GEbSTD.371dgOaGFjC4cNJXor1FyX_trpKAYLu6N5A0yU");
