@@ -13,14 +13,15 @@ app.listen(PORT, () => {
   console.log(`Web server is running on port ${PORT}`);
 });
 
-// Discord Bot setup with necessary intents
+// Discord Bot setup with necessary intents (including GuildPresences for online status)
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.DirectMessages,
-    GatewayIntentBits.GuildMembers
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildPresences
   ]
 });
 
@@ -167,7 +168,7 @@ client.on('interactionCreate', async interaction => {
     const customId = interaction.customId;
 
     if (customId.startsWith('vote_')) {
-      return interaction.reply({ content: '❌ Poll voting is currently running in local mode (Firebase removed).', ephemeral: true });
+      return interaction.reply({ content: '❌ Poll voting is currently running in local mode.', ephemeral: true });
     }
 
     if (customId.startsWith('enter_gw_')) {
