@@ -1,7 +1,7 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
 const express = require('express');
 
-// Express server for Render keep-alive & Wispbyte continuous port binding
+// Express server for Render keep-alive
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -136,7 +136,9 @@ client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
   const activeToken = process.env.TOKEN2 || process.env.TOKEN;
+  const rest = new REST({ version: '10' }).setToken(activeToken);
   
+  // Registers commands globally across all servers the bot is in
   try {
     console.log('Started refreshing global (/) commands.');
     await rest.put(
@@ -153,7 +155,7 @@ client.on('messageCreate', async message => {
   if (message.author.bot) return;
 
   if (!message.guild) {
-    const auditLogChannelId = '1530620291913613374'; 
+    const auditLogChannelId = '1430151280092905666'; 
     const auditChannel = client.channels.cache.get(auditLogChannelId);
     if (!auditChannel) return;
 
@@ -174,11 +176,59 @@ client.on('interactionCreate', async interaction => {
     const customId = interaction.customId;
 
     if (customId.startsWith('vote_')) {
-      return interaction.reply({ content: '❌ Poll voting is currently running in local mode.', ephemeral: true });
+      const [, pollId, optionNum] = customId.split('_');
+      const pollRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Polls/${pollId}.json`;
+      
+      const res = await fetch(pollRef);
+      const pollData = await res.json();
+
+      if (!pollData) {
+        return interaction.reply({ content: '❌ This poll instance is no longer valid.', ephemeral: true });
+      }
+
+      if (pollData.voters && pollData.voters[interaction.user.id]) {
+        return interaction.reply({ content: '⚠️ You have already submitted a vote for this poll.', ephemeral: true });
+      }
+
+      const updatedVoters = pollData.voters || {};
+      updatedVoters[interaction.user.id] = optionNum;
+
+      let v1 = pollData.votes1 || 0;
+      let v2 = pollData.votes2 || 0;
+      if (optionNum === '1') v1++;
+      if (optionNum === '2') v2++;
+
+      await fetch(pollRef, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ votes1: v1, votes2: v2, voters: updatedVoters })
+      });
+
+      const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+        .setDescription(`**${pollData.query}**\n\n🟢 **[1]** ${pollData.choice_a} — \`${v1}\` votes\n🔵 **[2]** ${pollData.choice_b} — \`${v2}\` votes`);
+
+      await interaction.message.edit({ embeds: [updatedEmbed] });
+      return interaction.reply({ content: `✅ Vote logged successfully for **${optionNum === '1' ? pollData.choice_a : pollData.choice_b}**!`, ephemeral: true });
     }
 
     if (customId.startsWith('enter_gw_')) {
-      return interaction.reply({ content: '🎉 **Confirmed!** You are registered for the giveaway event.', ephemeral: true });
+      const giveawayId = customId.replace('enter_gw_', '');
+      const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/ActiveGiveaways/${giveawayId}/participants/${interaction.user.id}.json`;
+      
+      const checkRes = await fetch(userRef);
+      const joined = await checkRes.json();
+
+      if (joined) {
+        return interaction.reply({ content: '⚠️ You are already entered into this prize draw!', ephemeral: true });
+      }
+
+      await fetch(userRef, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: interaction.user.tag, timestamp: Date.now() })
+      });
+
+      return interaction.reply({ content: '🎉 **Confirmed!** You are officially registered for the giveaway event.', ephemeral: true });
     }
     return;
   }
@@ -221,6 +271,12 @@ client.on('interactionCreate', async interaction => {
     const choiceB = interaction.options.getString('choice_b');
     const pollId = `poll_${Date.now()}`;
 
+    await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/Polls/${pollId}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, choice_a: choiceA, choice_b: choiceB, votes1: 0, votes2: 0, voters: {} })
+    });
+
     const btn1 = new ButtonBuilder().setCustomId(`vote_${pollId}_1`).setLabel(choiceA).setStyle(ButtonStyle.Success);
     const btn2 = new ButtonBuilder().setCustomId(`vote_${pollId}_2`).setLabel(choiceB).setStyle(ButtonStyle.Secondary);
     const row = new ActionRowBuilder().addComponents(btn1, btn2);
@@ -246,6 +302,12 @@ client.on('interactionCreate', async interaction => {
     const endTime = Date.now() + (lengthMins * 60 * 1000);
     const giveawayId = `gw_${Date.now()}`;
 
+    await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/ActiveGiveaways/${giveawayId}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item, participants: {}, status: 'active', endTime })
+    });
+
     const joinButton = new ButtonBuilder()
       .setCustomId(`enter_gw_${giveawayId}`)
       .setLabel('🎁 Enter Raffle')
@@ -264,14 +326,30 @@ client.on('interactionCreate', async interaction => {
 
     setTimeout(async () => {
       try {
+        const res = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/ActiveGiveaways/${giveawayId}/participants.json`);
+        const participantsObj = await res.json();
+
+        if (!participantsObj) {
+          return msg.edit({ content: `❌ Giveaway for **${item}** finished without any participants entering.`, embeds: [], components: [] });
+        }
+
+        const userIds = Object.keys(participantsObj);
+        const winners = [];
+
+        for (let i = 0; i < Math.min(slotCount, userIds.length); i++) {
+          const randomIndex = Math.floor(Math.random() * userIds.length);
+          winners.push(participantsObj[userIds[randomIndex]].username);
+          userIds.splice(randomIndex, 1);
+        }
+
         const endedEmbed = new EmbedBuilder()
           .setColor('#57F287')
           .setTitle('🏆 RAFFLE DRAW CONCLUDED 🏆')
-          .setDescription(`Prize: **${item}**`)
+          .setDescription(`Prize: **${item}**\n\n👑 **Winner(s):**\n${winners.map(w => `• @${w}`).join('\n')}`)
           .setTimestamp();
 
         await msg.edit({ embeds: [endedEmbed], components: [] });
-        await interaction.followUp({ content: `🎊 Giveaway for **${item}** has concluded!` });
+        await interaction.followUp({ content: `🎊 Big congratulations to ${winners.map(w => `@${w}`).join(', ')} for winning **${item}**!` });
       } catch (err) {
         console.error('Giveaway failure:', err);
       }
@@ -473,4 +551,5 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
+// Secure login using TOKEN2 with TOKEN fallback
 client.login(process.env.TOKEN2 || process.env.TOKEN);
