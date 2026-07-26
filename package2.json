@@ -1,13 +1,13 @@
 {
-  "name": "khaby-s-discord-bot",
+  "name": "Khaby's-utilities",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "Discord Bot Utilities",
+  "main": "index2.js",
   "scripts": {
     "start": "node index2.js"
   },
   "dependencies": {
-    "discord.js": "^14.27.0",
-    "express": "^4.22.2",
-    "firebase-admin": "^14.2.0"
+    "discord.js": "^14.14.1",
+    "express": "^4.19.2"
   }
 }
