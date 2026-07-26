@@ -250,7 +250,7 @@ client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}![cite: 3]`);
 
   const GUILD_ID = '1430150908490027090';
-  const rest = new REST({ version: '10' }).setToken(process.env.TOKEN2);
+  const rest = new REST({ version: '10' }).setToken(process.env.TOKEN2 || process.env.TOKEN);
   
   try {
     console.log('Started refreshing guild (/) commands.');
@@ -1200,5 +1200,4 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-client.login(process.env.TOKEN);
 client.login(process.env.TOKEN2 || process.env.TOKEN);
