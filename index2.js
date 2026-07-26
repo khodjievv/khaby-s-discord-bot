@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
 const express = require('express');
 
 // Express server for Render keep-alive
@@ -23,8 +23,17 @@ const client = new Client({
   ]
 });
 
-// Empty commands array (Ready for your new command builders)
-const commands = [].map(command => command.toJSON());
+// Define Slash Commands including /speak
+const commands = [
+  new SlashCommandBuilder()
+    .setName('speak')
+    .setDescription('Makes the bot say whatever you type')
+    .addStringOption(option => 
+      option.setName('message')
+        .setDescription('The message you want the bot to say')
+        .setRequired(true)
+    )
+].map(command => command.toJSON());
 
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
@@ -46,10 +55,16 @@ client.once('ready', async () => {
   }
 });
 
-// Interaction handler skeleton for future commands
+// Interaction handler for commands
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
-  // Your new command logic will go here
+
+  const { commandName } = interaction;
+
+  if (commandName === 'speak') {
+    const messageText = interaction.options.getString('message');
+    await interaction.reply({ content: messageText });
+  }
 });
 
 // Secure login using TOKEN2 with TOKEN fallback
