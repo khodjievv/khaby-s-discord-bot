@@ -24,7 +24,7 @@ const client = new Client({
   ]
 });
 
-// Define Slash Commands with fresh wording and descriptions
+// Define Slash Commands globally
 const commands = [
   new SlashCommandBuilder()
     .setName('speak')
@@ -127,27 +127,25 @@ const commands = [
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
-  const GUILD_ID = '1530333292052611093';
   const activeToken = process.env.TOKEN2 || process.env.TOKEN;
   const rest = new REST({ version: '10' }).setToken(activeToken);
   
+  // Registers commands globally across all servers the bot is in
   try {
-    console.log('Started refreshing guild (/) commands.');
+    console.log('Started refreshing global (/) commands.');
     await rest.put(
-      Routes.applicationGuildCommands(client.user.id, GUILD_ID),
+      Routes.applicationCommands(client.user.id),
       { body: commands },
     );
-    console.log('Successfully reloaded and updated guild (/) commands.');
+    console.log('Successfully reloaded and updated global (/) commands.');
   } catch (error) {
-    console.error('Failed to register commands:', error);
+    console.error('Failed to register global commands:', error);
   }
 });
 
-// DM Reply forwarding system tracker
 client.on('messageCreate', async message => {
   if (message.author.bot) return;
 
-  // Handle incoming DMs sent to the bot and relay them to a logging channel
   if (!message.guild) {
     const auditLogChannelId = '1530620291913613374'; 
     const auditChannel = client.channels.cache.get(auditLogChannelId);
@@ -165,7 +163,6 @@ client.on('messageCreate', async message => {
   }
 });
 
-// Interaction handler for all commands and UI components
 client.on('interactionCreate', async interaction => {
   if (interaction.isButton()) {
     const customId = interaction.customId;
