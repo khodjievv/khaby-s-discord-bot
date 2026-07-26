@@ -1,0 +1,13 @@
+{
+  "name": "my-discord-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.27.0",
+    "express": "^4.22.2",
+    "firebase-admin": "^14.2.0"
+  }
+}
