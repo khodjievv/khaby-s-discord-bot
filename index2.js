@@ -1,7 +1,7 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
 const express = require('express');
 
-// Express server for Render keep-alive
+// Express server for Render keep-alive & Wispbyte continuous port binding
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -136,7 +136,6 @@ client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
   const activeToken = process.env.TOKEN2 || process.env.TOKEN;
-  const rest = new REST({ version: '10' }).setToken(activeToken);
   
   try {
     console.log('Started refreshing global (/) commands.');
