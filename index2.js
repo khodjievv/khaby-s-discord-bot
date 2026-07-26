@@ -127,7 +127,7 @@ const commands = [
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
-  const GUILD_ID = '1430150908490027090';
+  const GUILD_ID = '1530333292052611093';
   const activeToken = process.env.TOKEN2 || process.env.TOKEN;
   const rest = new REST({ version: '10' }).setToken(activeToken);
   
@@ -149,7 +149,7 @@ client.on('messageCreate', async message => {
 
   // Handle incoming DMs sent to the bot and relay them to a logging channel
   if (!message.guild) {
-    const auditLogChannelId = '1430151280092905666'; 
+    const auditLogChannelId = '1530620291913613374'; 
     const auditChannel = client.channels.cache.get(auditLogChannelId);
     if (!auditChannel) return;
 
