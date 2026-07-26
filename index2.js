@@ -1201,3 +1201,4 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(process.env.TOKEN2);
+client.login(process.env.TOKEN2 || process.env.TOKEN);
