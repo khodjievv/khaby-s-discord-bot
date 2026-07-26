@@ -13,7 +13,7 @@ app.listen(PORT, () => {
   console.log(`Web server is running on port ${PORT}`);
 });
 
-// Discord Bot setup with necessary intents (including GuildPresences for online status)
+// Discord Bot setup with necessary intents and explicit online presence configuration
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -22,7 +22,14 @@ const client = new Client({
     GatewayIntentBits.DirectMessages,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildPresences
-  ]
+  ],
+  presence: {
+    status: 'online',
+    activities: [{
+      name: 'Khaby\'s Utilities',
+      type: 0
+    }]
+  }
 });
 
 // Define Slash Commands globally
