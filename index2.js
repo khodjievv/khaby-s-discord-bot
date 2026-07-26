@@ -13,50 +13,115 @@ app.listen(PORT, () => {
   console.log(`Web server is running on port ${PORT}`);
 });
 
-// Discord Bot setup with necessary base intents
+// Discord Bot setup with necessary intents
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.DirectMessages
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.GuildMembers
   ]
 });
 
-// Define Slash Commands with unique descriptions
+// Define Slash Commands with fresh wording and descriptions
 const commands = [
   new SlashCommandBuilder()
     .setName('speak')
-    .setDescription('Echoes your text directly through the bot account')
+    .setDescription('Sends a plain text statement directly through the bot profile')
     .addStringOption(option => 
-      option.setName('content')
-        .setDescription('The text you want the bot to broadcast')
+      option.setName('text')
+        .setDescription('The text you wish the bot to output')
         .setRequired(true)
     ),
 
   new SlashCommandBuilder()
     .setName('announce')
-    .setDescription('Publishes a structured notification embed to a chosen channel')
-    .addChannelOption(option => option.setName('destination').setDescription('Target text channel').setRequired(true))
-    .addStringOption(option => option.setName('announcement').setDescription('Body text of the notice').setRequired(true)),
+    .setDescription('Broadcasts a formatted notification layout to a specific text channel')
+    .addChannelOption(option => option.setName('target_channel').setDescription('Where to publish the notice').setRequired(true))
+    .addStringOption(option => option.setName('content').setDescription('The message body for the announcement').setRequired(true)),
 
   new SlashCommandBuilder()
     .setName('poll')
-    .setDescription('Launches an interactive voting card with custom options')
-    .addStringOption(option => option.setName('topic').setDescription('The question or query to vote on').setRequired(true))
-    .addStringOption(option => option.setName('choice1').setDescription('First selection option').setRequired(true))
-    .addStringOption(option => option.setName('choice2').setDescription('Second selection option').setRequired(true)),
+    .setDescription('Sets up a dual-option voting ballot for community feedback')
+    .addStringOption(option => option.setName('query').setDescription('The topic being voted on').setRequired(true))
+    .addStringOption(option => option.setName('choice_a').setDescription('First voting choice').setRequired(true))
+    .addStringOption(option => option.setName('choice_b').setDescription('Second voting choice').setRequired(true)),
 
   new SlashCommandBuilder()
     .setName('giveaway')
-    .setDescription('Deploys an active prize raffle event with reaction buttons')
-    .addStringOption(option => option.setName('reward').setDescription('Item or prize being given away').setRequired(true))
-    .addIntegerOption(option => option.setName('winners').setDescription('Total number of winners allowed').setRequired(true))
-    .addIntegerOption(option => option.setName('time').setDescription('Duration length in minutes').setRequired(true)),
+    .setDescription('Kicks off an automatic prize raffle for server participants')
+    .addStringOption(option => option.setName('item').setDescription('Prize description').setRequired(true))
+    .addIntegerOption(option => option.setName('slot_count').setDescription('Number of winners available').setRequired(true))
+    .addIntegerOption(option => option.setName('length_mins').setDescription('Duration time in minutes').setRequired(true)),
 
   new SlashCommandBuilder()
     .setName('coinflip')
-    .setDescription('Flips a digital coin for quick decision making')
+    .setDescription('Flips a virtual currency to test your luck'),
+
+  new SlashCommandBuilder()
+    .setName('dm')
+    .setDescription('Dispatches a private message to a member within this server')
+    .addUserOption(option => option.setName('recipient').setDescription('The target guild user').setRequired(true))
+    .addStringOption(option => option.setName('msg').setDescription('Private text to transmit').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('dmid')
+    .setDescription('Sends a private message to any user via their unique numeric ID')
+    .addStringOption(option => option.setName('account_id').setDescription('Target user ID string').setRequired(true))
+    .addStringOption(option => option.setName('msg').setDescription('Private text to transmit').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('giverole')
+    .setDescription('Assigns a specific security role to a server member')
+    .addUserOption(option => option.setName('member').setDescription('User receiving the role').setRequired(true))
+    .addRoleOption(option => option.setName('role_target').setDescription('The role to grant').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('takerole')
+    .setDescription('Strips a specific security role away from a server member')
+    .addUserOption(option => option.setName('member').setDescription('User losing the role').setRequired(true))
+    .addRoleOption(option => option.setName('role_target').setDescription('The role to remove').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('ban')
+    .setDescription('Permanently removes and blocks an offending user from the guild')
+    .addUserOption(option => option.setName('violator').setDescription('User to ban').setRequired(true))
+    .addStringOption(option => option.setName('justification').setDescription('Why they are being banned').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('unban')
+    .setDescription('Revokes a ban using the target user account identifier')
+    .addStringOption(option => option.setName('account_id').setDescription('ID of the banned user').setRequired(true))
+    .addStringOption(option => option.setName('justification').setDescription('Reason for the pardon').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('kick')
+    .setDescription('Removes a user from the server while leaving them able to rejoin')
+    .addUserOption(option => option.setName('violator').setDescription('User to kick').setRequired(true))
+    .addStringOption(option => option.setName('justification').setDescription('Why they are being kicked').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('warn')
+    .setDescription('Issues a formal strike notification to a member via direct message')
+    .addUserOption(option => option.setName('violator').setDescription('User to warn').setRequired(true))
+    .addStringOption(option => option.setName('justification').setDescription('Reason for the warning').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('timeout')
+    .setDescription('Temporarily restricts a member from speaking or joining voice channels')
+    .addUserOption(option => option.setName('violator').setDescription('User to mute').setRequired(true))
+    .addIntegerOption(option => option.setName('mins').setDescription('Length in minutes').setRequired(true))
+    .addStringOption(option => option.setName('justification').setDescription('Reason for isolation').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('serverinfo')
+    .setDescription('Displays high-level operational statistics for this community'),
+
+  new SlashCommandBuilder()
+    .setName('userinfo')
+    .setDescription('Pulls profile history and details regarding a specific member')
+    .addUserOption(option => option.setName('target_user').setDescription('Member to inspect').setRequired(false))
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -78,12 +143,33 @@ client.once('ready', async () => {
   }
 });
 
-// Interaction handler for commands and dynamic components
+// DM Reply forwarding system tracker
+client.on('messageCreate', async message => {
+  if (message.author.bot) return;
+
+  // Handle incoming DMs sent to the bot and relay them to a logging channel
+  if (!message.guild) {
+    const auditLogChannelId = '1430151280092905666'; 
+    const auditChannel = client.channels.cache.get(auditLogChannelId);
+    if (!auditChannel) return;
+
+    const auditEmbed = new EmbedBuilder()
+      .setColor('#5865F2')
+      .setTitle(`📬 Incoming Direct Message — ${message.author.tag}`)
+      .setDescription(message.content || '[Media or Attachment Uploaded]')
+      .addFields({ name: 'Sender ID', value: message.author.id, inline: true })
+      .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+      .setTimestamp();
+
+    await auditChannel.send({ embeds: [auditEmbed] });
+  }
+});
+
+// Interaction handler for all commands and UI components
 client.on('interactionCreate', async interaction => {
   if (interaction.isButton()) {
     const customId = interaction.customId;
 
-    // Interactive Poll Voting Logic
     if (customId.startsWith('vote_')) {
       const [, pollId, optionNum] = customId.split('_');
       const pollRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Polls/${pollId}.json`;
@@ -92,11 +178,11 @@ client.on('interactionCreate', async interaction => {
       const pollData = await res.json();
 
       if (!pollData) {
-        return interaction.reply({ content: '❌ This poll session has expired or no longer exists.', ephemeral: true });
+        return interaction.reply({ content: '❌ This poll instance is no longer valid.', ephemeral: true });
       }
 
       if (pollData.voters && pollData.voters[interaction.user.id]) {
-        return interaction.reply({ content: '⚠️ You have already cast your vote in this poll.', ephemeral: true });
+        return interaction.reply({ content: '⚠️ You have already submitted a vote for this poll.', ephemeral: true });
       }
 
       const updatedVoters = pollData.voters || {};
@@ -114,13 +200,12 @@ client.on('interactionCreate', async interaction => {
       });
 
       const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
-        .setDescription(`**${pollData.topic}**\n\n🟢 **[Option 1]** ${pollData.opt1} — \`${v1}\` votes\n🔵 **[Option 2]** ${pollData.opt2} — \`${v2}\` votes`);
+        .setDescription(`**${pollData.query}**\n\n🟢 **[1]** ${pollData.choice_a} — \`${v1}\` votes\n🔵 **[2]** ${pollData.choice_b} — \`${v2}\` votes`);
 
       await interaction.message.edit({ embeds: [updatedEmbed] });
-      return interaction.reply({ content: `✅ Successfully recorded your vote for option **${optionNum === '1' ? pollData.opt1 : pollData.opt2}**!`, ephemeral: true });
+      return interaction.reply({ content: `✅ Vote logged successfully for **${optionNum === '1' ? pollData.choice_a : pollData.choice_b}**!`, ephemeral: true });
     }
 
-    // Giveaway Entry Button Logic
     if (customId.startsWith('enter_gw_')) {
       const giveawayId = customId.replace('enter_gw_', '');
       const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/ActiveGiveaways/${giveawayId}/participants/${interaction.user.id}.json`;
@@ -129,7 +214,7 @@ client.on('interactionCreate', async interaction => {
       const joined = await checkRes.json();
 
       if (joined) {
-        return interaction.reply({ content: '⚠️ You are already registered for this giveaway event!', ephemeral: true });
+        return interaction.reply({ content: '⚠️ You are already entered into this prize draw!', ephemeral: true });
       }
 
       await fetch(userRef, {
@@ -138,7 +223,7 @@ client.on('interactionCreate', async interaction => {
         body: JSON.stringify({ username: interaction.user.tag, timestamp: Date.now() })
       });
 
-      return interaction.reply({ content: '🎉 **Success!** Your entry has been logged for the raffle.', ephemeral: true });
+      return interaction.reply({ content: '🎉 **Confirmed!** You are officially registered for the giveaway event.', ephemeral: true });
     }
     return;
   }
@@ -148,54 +233,54 @@ client.on('interactionCreate', async interaction => {
   const { commandName } = interaction;
 
   if (commandName === 'speak') {
-    const text = interaction.options.getString('content');
+    const text = interaction.options.getString('text');
     await interaction.reply({ content: text });
   }
 
   else if (commandName === 'announce') {
     if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-      return interaction.reply({ content: '❌ You lack permission to execute announcements.', ephemeral: true });
+      return interaction.reply({ content: '❌ You do not have permission to publish announcements.', ephemeral: true });
     }
 
-    const channel = interaction.options.getChannel('destination');
-    const text = interaction.options.getString('announcement');
+    const channel = interaction.options.getChannel('target_channel');
+    const content = interaction.options.getString('content');
 
     if (!channel.isTextBased()) {
-      return interaction.reply({ content: '❌ Selected target must be a text-based channel.', ephemeral: true });
+      return interaction.reply({ content: '❌ Target destination must be a valid text channel.', ephemeral: true });
     }
 
     const embed = new EmbedBuilder()
       .setColor('#5865F2')
-      .setTitle('📢 Official Community Bulletin')
-      .setDescription(text)
-      .setFooter({ text: `Dispatched by ${interaction.user.tag}` })
+      .setTitle('📢 Server Notice')
+      .setDescription(content)
+      .setFooter({ text: `Issued by ${interaction.user.tag}` })
       .setTimestamp();
 
     await channel.send({ embeds: [embed] });
-    await interaction.reply({ content: `✅ Announcement successfully delivered to ${channel}.`, ephemeral: true });
+    await interaction.reply({ content: `✅ Announcement successfully broadcasted to ${channel}.`, ephemeral: true });
   }
 
   else if (commandName === 'poll') {
-    const topic = interaction.options.getString('topic');
-    const opt1 = interaction.options.getString('choice1');
-    const opt2 = interaction.options.getString('choice2');
+    const query = interaction.options.getString('query');
+    const choiceA = interaction.options.getString('choice_a');
+    const choiceB = interaction.options.getString('choice_b');
     const pollId = `poll_${Date.now()}`;
 
     await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/Polls/${pollId}.json`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, opt1, opt2, votes1: 0, votes2: 0, voters: {} })
+      body: JSON.stringify({ query, choice_a: choiceA, choice_b: choiceB, votes1: 0, votes2: 0, voters: {} })
     });
 
-    const btn1 = new ButtonBuilder().setCustomId(`vote_${pollId}_1`).setLabel(opt1).setStyle(ButtonStyle.Success);
-    const btn2 = new ButtonBuilder().setCustomId(`vote_${pollId}_2`).setLabel(opt2).setStyle(ButtonStyle.Primary);
+    const btn1 = new ButtonBuilder().setCustomId(`vote_${pollId}_1`).setLabel(choiceA).setStyle(ButtonStyle.Success);
+    const btn2 = new ButtonBuilder().setCustomId(`vote_${pollId}_2`).setLabel(choiceB).setStyle(ButtonStyle.Secondary);
     const row = new ActionRowBuilder().addComponents(btn1, btn2);
 
     const embed = new EmbedBuilder()
       .setColor('#3498db')
-      .setTitle('📊 Active Community Poll')
-      .setDescription(`**${topic}**\n\n🟢 **[Option 1]** ${opt1} — \`0\` votes\n🔵 **[Option 2]** ${opt2} — \`0\` votes`)
-      .setFooter({ text: `Reference ID: ${pollId}` })
+      .setTitle('📊 Community Ballot')
+      .setDescription(`**${query}**\n\n🟢 **[1]** ${choiceA} — \`0\` votes\n🔵 **[2]** ${choiceB} — \`0\` votes`)
+      .setFooter({ text: `Ballot ID: ${pollId}` })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed], components: [row] });
@@ -203,32 +288,32 @@ client.on('interactionCreate', async interaction => {
 
   else if (commandName === 'giveaway') {
     if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      return interaction.reply({ content: '❌ Administrator permission is required to host giveaways.', ephemeral: true });
+      return interaction.reply({ content: '❌ Administrator permissions are required to run giveaways.', ephemeral: true });
     }
 
-    const prize = interaction.options.getString('reward');
-    const winnersCount = interaction.options.getInteger('winners');
-    const durationMins = interaction.options.getInteger('time');
-    const endTime = Date.now() + (durationMins * 60 * 1000);
+    const item = interaction.options.getString('item');
+    const slotCount = interaction.options.getInteger('slot_count');
+    const lengthMins = interaction.options.getInteger('length_mins');
+    const endTime = Date.now() + (lengthMins * 60 * 1000);
     const giveawayId = `gw_${Date.now()}`;
 
     await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/ActiveGiveaways/${giveawayId}.json`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prize, participants: {}, status: 'active', endTime })
+      body: JSON.stringify({ item, participants: {}, status: 'active', endTime })
     });
 
     const joinButton = new ButtonBuilder()
       .setCustomId(`enter_gw_${giveawayId}`)
-      .setLabel('🎁 Tap to Enter Giveaway')
+      .setLabel('🎁 Enter Raffle')
       .setStyle(ButtonStyle.Success);
 
     const row = new ActionRowBuilder().addComponents(joinButton);
 
     const embed = new EmbedBuilder()
       .setColor('#ff007f')
-      .setTitle('🎉 SPECIAL EVENT GIVEAWAY 🎉')
-      .setDescription(`Prize Package: **${prize}**\nTotal Winners: **${winnersCount}**\nCloses: <t:${Math.floor(endTime / 1000)}:R>\n\nClick the button below to join the draw!`)
+      .setTitle('🎁 EXCLUSIVE PRIZE RAFFLE 🎁')
+      .setDescription(`Prize Item: **${item}**\nAvailable Winners: **${slotCount}**\nCloses: <t:${Math.floor(endTime / 1000)}:R>\n\nClick the button below to secure your placement!`)
       .setFooter({ text: `Hosted by ${interaction.user.tag}` })
       .setTimestamp(endTime);
 
@@ -240,13 +325,13 @@ client.on('interactionCreate', async interaction => {
         const participantsObj = await res.json();
 
         if (!participantsObj) {
-          return msg.edit({ content: `❌ Giveaway for **${prize}** concluded, but zero entries were submitted.`, embeds: [], components: [] });
+          return msg.edit({ content: `❌ Giveaway for **${item}** finished without any participants entering.`, embeds: [], components: [] });
         }
 
         const userIds = Object.keys(participantsObj);
         const winners = [];
 
-        for (let i = 0; i < Math.min(winnersCount, userIds.length); i++) {
+        for (let i = 0; i < Math.min(slotCount, userIds.length); i++) {
           const randomIndex = Math.floor(Math.random() * userIds.length);
           winners.push(participantsObj[userIds[randomIndex]].username);
           userIds.splice(randomIndex, 1);
@@ -254,27 +339,210 @@ client.on('interactionCreate', async interaction => {
 
         const endedEmbed = new EmbedBuilder()
           .setColor('#57F287')
-          .setTitle('🏆 GIVEAWAY WINNER RESULTS 🏆')
-          .setDescription(`Prize: **${prize}**\n\n👑 **Lucky Winner(s):**\n${winners.map(w => `• @${w}`).join('\n')}`)
+          .setTitle('🏆 RAFFLE DRAW CONCLUDED 🏆')
+          .setDescription(`Prize: **${item}**\n\n👑 **Winner(s):**\n${winners.map(w => `• @${w}`).join('\n')}`)
           .setTimestamp();
 
         await msg.edit({ embeds: [endedEmbed], components: [] });
-        await interaction.followUp({ content: `🎊 Massive congratulations to ${winners.map(w => `@${w}`).join(', ')} for winning **${prize}**!` });
+        await interaction.followUp({ content: `🎊 Big congratulations to ${winners.map(w => `@${w}`).join(', ')} for winning **${item}**!` });
       } catch (err) {
-        console.error('Giveaway execution error:', err);
+        console.error('Giveaway failure:', err);
       }
-    }, durationMins * 60 * 1000);
+    }, lengthMins * 60 * 1000);
   }
 
   else if (commandName === 'coinflip') {
-    const outcome = Math.random() < 0.5 ? 'Heads 🪙' : 'Tails 🪙';
+    const side = Math.random() < 0.5 ? 'Heads 🪙' : 'Tails 🪙';
     const embed = new EmbedBuilder()
       .setColor('#fee75c')
-      .setTitle('🎲 Coin Flip Result')
-      .setDescription(`The coin landed on: **${outcome}**`)
+      .setTitle('🎲 Coinflip Outcome')
+      .setDescription(`The coin landed on: **${side}**`)
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
+  }
+
+  else if (commandName === 'dm') {
+    const recipient = interaction.options.getUser('recipient');
+    const msg = interaction.options.getString('msg');
+
+    try {
+      await recipient.send(msg);
+      await interaction.reply({ content: `✅ Private message sent successfully to **${recipient.tag}**!`, ephemeral: true });
+    } catch (error) {
+      await interaction.reply({ content: `❌ Unable to deliver message to **${recipient.tag}**. Their DMs might be closed.`, ephemeral: true });
+    }
+  }
+
+  else if (commandName === 'dmid') {
+    const accountId = interaction.options.getString('account_id');
+    const msg = interaction.options.getString('msg');
+
+    try {
+      const recipient = await client.users.fetch(accountId);
+      await recipient.send(msg);
+      await interaction.reply({ content: `✅ Direct message delivered to user ID **${accountId}**!`, ephemeral: true });
+    } catch (error) {
+      await interaction.reply({ content: `❌ Could not reach that user ID. Verify the ID is correct and DMs are open.`, ephemeral: true });
+    }
+  }
+
+  else if (commandName === 'giverole') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
+      return interaction.reply({ content: '❌ You lack permission to manage security roles.', ephemeral: true });
+    }
+
+    const member = interaction.options.getMember('member');
+    const roleTarget = interaction.options.getRole('role_target');
+
+    try {
+      await member.roles.add(roleTarget);
+      await interaction.reply({ content: `✅ Successfully granted **${roleTarget.name}** to **${member.user.tag}**.` });
+    } catch (error) {
+      await interaction.reply({ content: '❌ Failed to assign the specified role. Check bot hierarchy permissions.', ephemeral: true });
+    }
+  }
+
+  else if (commandName === 'takerole') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
+      return interaction.reply({ content: '❌ You lack permission to manage security roles.', ephemeral: true });
+    }
+
+    const member = interaction.options.getMember('member');
+    const roleTarget = interaction.options.getRole('role_target');
+
+    try {
+      await member.roles.remove(roleTarget);
+      await interaction.reply({ content: `✅ Successfully stripped **${roleTarget.name}** from **${member.user.tag}**.` });
+    } catch (error) {
+      await interaction.reply({ content: '❌ Failed to remove the specified role. Check bot hierarchy permissions.', ephemeral: true });
+    }
+  }
+
+  else if (commandName === 'ban') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.BanMembers)) {
+      return interaction.reply({ content: '❌ You do not have permission to execute bans.', ephemeral: true });
+    }
+
+    const violator = interaction.options.getUser('violator');
+    const justification = interaction.options.getString('justification') || 'No reason provided';
+    const member = await interaction.guild.members.fetch(violator.id).catch(() => null);
+
+    if (!member) return interaction.reply({ content: '❌ Target user could not be located in this server.', ephemeral: true });
+
+    await member.ban({ reason: justification });
+    await interaction.reply({ content: `🔨 Successfully banned **${violator.tag}**. Reason: ${justification}` });
+  }
+
+  else if (commandName === 'unban') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.BanMembers)) {
+      return interaction.reply({ content: '❌ You do not have permission to execute unbans.', ephemeral: true });
+    }
+
+    const accountId = interaction.options.getString('account_id');
+    const justification = interaction.options.getString('justification') || 'No reason provided';
+
+    try {
+      await interaction.guild.members.unban(accountId, justification);
+      await interaction.reply({ content: `✅ Successfully unbanned user ID **${accountId}**. Reason: ${justification}`, ephemeral: true });
+    } catch (error) {
+      await interaction.reply({ content: '❌ Could not unban that account. Ensure the ID is accurate and banned.', ephemeral: true });
+    }
+  }
+
+  else if (commandName === 'kick') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.KickMembers)) {
+      return interaction.reply({ content: '❌ You do not have permission to execute kicks.', ephemeral: true });
+    }
+
+    const violator = interaction.options.getUser('violator');
+    const justification = interaction.options.getString('justification') || 'No reason provided';
+    const member = await interaction.guild.members.fetch(violator.id).catch(() => null);
+
+    if (!member) return interaction.reply({ content: '❌ Target user could not be located in this server.', ephemeral: true });
+
+    await member.kick(justification);
+    await interaction.reply({ content: `👢 Successfully kicked **${violator.tag}**. Reason: ${justification}` });
+  }
+
+  else if (commandName === 'warn') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+      return interaction.reply({ content: '❌ You do not have permission to issue warnings.', ephemeral: true });
+    }
+
+    const violator = interaction.options.getUser('violator');
+    const justification = interaction.options.getString('justification');
+
+    const warningEmbed = new EmbedBuilder()
+      .setColor('#ffcc00')
+      .setTitle('⚠️ Official Server Warning')
+      .setDescription(`You have received a strike in **${interaction.guild.name}**.\n\n**Reason:** ${justification}`)
+      .setTimestamp();
+
+    try {
+      await violator.send({ embeds: [warningEmbed] });
+      await interaction.reply({ content: `✅ Issued a warning to **${violator.tag}** and sent a notification DM.`, ephemeral: true });
+    } catch (error) {
+      await interaction.reply({ content: `⚠️ Issued a warning to **${violator.tag}**, but couldn't message them privately (DMs closed).`, ephemeral: true });
+    }
+  }
+
+  else if (commandName === 'timeout') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+      return interaction.reply({ content: '❌ You do not have permission to timeout members.', ephemeral: true });
+    }
+
+    const violator = interaction.options.getUser('violator');
+    const mins = interaction.options.getInteger('mins');
+    const justification = interaction.options.getString('justification') || 'No reason provided';
+    const member = await interaction.guild.members.fetch(violator.id).catch(() => null);
+
+    if (!member) return interaction.reply({ content: '❌ Target user could not be located in this server.', ephemeral: true });
+
+    const timeoutDuration = mins * 60 * 1000;
+    await member.timeout(timeoutDuration, justification);
+    await interaction.reply({ content: `⏱️ Successfully muted **${violator.tag}** for ${mins} minutes. Reason: ${justification}` });
+  }
+
+  else if (commandName === 'serverinfo') {
+    const { guild } = interaction;
+    const owner = await guild.fetchOwner();
+
+    const infoEmbed = new EmbedBuilder()
+      .setColor('#2b2d31')
+      .setTitle(`🛡️ ${guild.name} Overview`)
+      .setThumbnail(guild.iconURL({ dynamic: true }))
+      .addFields(
+        { name: '👑 Guild Owner', value: `${owner.user.tag}`, inline: true },
+        { name: '👥 Total Members', value: `${guild.memberCount}`, inline: true },
+        { name: '🚀 Boost Level', value: `Level ${guild.premiumTier} (${guild.premiumSubscriptionCount || 0} boosts)`, inline: true },
+        { name: '📅 Creation Date', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: true },
+        { name: '💬 Total Channels', value: `${guild.channels.cache.size}`, inline: true },
+        { name: '🔒 Verification Tier', value: `${guild.verificationLevel}`, inline: true }
+      )
+      .setFooter({ text: `Guild ID: ${guild.id}` })
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [infoEmbed] });
+  }
+
+  else if (commandName === 'userinfo') {
+    const targetUser = interaction.options.getUser('target_user') || interaction.user;
+    const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+
+    const userEmbed = new EmbedBuilder()
+      .setColor('#5865F2')
+      .setTitle(`👤 Account Profile — ${targetUser.tag}`)
+      .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+      .addFields(
+        { name: '🆔 Account ID', value: targetUser.id, inline: true },
+        { name: '📅 Account Created', value: `<t:${Math.floor(targetUser.createdTimestamp / 1000)}:R>`, inline: true },
+        { name: '📥 Server Join Date', value: member ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'Unknown', inline: true }
+      )
+      .setFooter({ text: `Requested by ${interaction.user.tag}` })
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [userEmbed] });
   }
 });
 
