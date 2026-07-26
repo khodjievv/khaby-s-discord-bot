@@ -247,9 +247,9 @@ const commands = [
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
-  console.log(`Logged in as ${client.user.tag}!`);
+  console.log(`Logged in as ${client.user.tag}![cite: 3]`);
 
-  const GUILD_ID = '1430150908490027090';
+  const GUILD_ID = '1530333292052611093';
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
   
   try {
@@ -406,6 +406,20 @@ client.on('interactionCreate', async interaction => {
       await interaction.message.edit({ embeds: [updatedEmbed] });
       return interaction.reply({ content: `✅ Successfully voted for option **${optionNum === '1' ? pollData.opt1 : pollData.opt2}**!`, ephemeral: true });
     }
+
+    // C. Ticket Close Button Handler
+    if (customId === 'close_ticket') {
+      await interaction.reply({ content: '🔒 Closing this ticket in 5 seconds...', ephemeral: true });
+      setTimeout(async () => {
+        try {
+          await interaction.channel.delete();
+        } catch (err) {
+          console.error('Failed to delete ticket channel:', err);
+        }
+      }, 5000);
+      return;
+    }
+
     return;
   }
 
