@@ -368,7 +368,7 @@ client.on('interactionCreate', async interaction => {
       .setColor('#3498db')
       .setTitle('❓ Support')
       .setDescription('Do you have any questions regarding the server or game?\nCreate a ticket here and our moderators will help you!\n\nPlease keep in mind that creating joke tickets is against the rules.')
-      .setFooter({ text: 'Official Ticket Tool Partner' });
+      .setFooter({ text: "Khaby's Utilities" });
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
