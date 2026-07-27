@@ -101,23 +101,19 @@ client.once('ready', async () => {
 // --- RELIABLE WELCOME EVENT ---
 client.on('guildMemberAdd', async member => {
   try {
-    const welcomeChannelId = '1530563110463738061';
+    const welcomeChannelId = '1530563856466968576';
     const channel = member.guild.channels.cache.get(welcomeChannelId);
     if (!channel) return;
 
     const welcomeEmbed = new EmbedBuilder()
       .setColor('#3498db')
-      .setTitle(`🎉 Welcome to Khaby's Productions!`)
-      .setDescription(`Hey ${member} (**${member.user.tag}**), glad to have you here! Enjoy your stay.`)
-      .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
+      .setTitle(`Welcome to Khaby's Utilities!`)
+      .setDescription(`Here's a few things you can do in our server!\n\n📄 | **Read rules before starting a conversation!**\n• #rules-info — Click me to read rules!\n\n💖 | **This server is a helpful community dedicated to custom bots, coding, and hanging out!**\n\n📜 | **Do not hesitate to ping a staff for any issues!**\nIf it's regarding bugs, staff report or anything else, create a ticket!\n🎟️ | #support — Click me to view support!\n\n⏳ | ... And thats basically it!\nLook around the server. You'll get it!`)
       .setImage('https://media.discordapp.net/attachments/1530563110463738061/1531256712491696208/khabywelcomes.png?ex=6a688d71&is=6a673bf1&hm=c48a8e9b541e61252b7430799a6330b621b245c89e161a65931048ac22a81514&=&format=webp&quality=lossless&width=1354&height=672')
-      .addFields(
-        { name: '📊 Member Count', value: `${member.guild.memberCount} members`, inline: true },
-        { name: '🆔 User ID', value: member.id, inline: true }
-      )
       .setTimestamp();
 
-    await channel.send({ content: `Welcome ${member}!`, embeds: [welcomeEmbed] });
+    const sentMessage = await channel.send({ content: `Welcome to Khaby's Utilities! ${member}`, embeds: [welcomeEmbed] });
+    await sentMessage.react('👋');
   } catch (err) {
     console.error('Welcome event error:', err);
   }
