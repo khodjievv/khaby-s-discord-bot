@@ -50,6 +50,12 @@ const commands = [
     .addStringOption(option => option.setName('content').setDescription('The message body for the announcement').setRequired(true)),
 
   new SlashCommandBuilder()
+    .setName('update')
+    .setDescription('Broadcasts a New Update notification layout to a specific text channel')
+    .addChannelOption(option => option.setName('target_channel').setDescription('Where to publish the update').setRequired(true))
+    .addStringOption(option => option.setName('message').setDescription('The update details or message body').setRequired(true)),
+
+  new SlashCommandBuilder()
     .setName('poll')
     .setDescription('Sets up a dual-option voting ballot for community feedback')
     .addStringOption(option => option.setName('query').setDescription('The topic being voted on').setRequired(true))
@@ -394,6 +400,29 @@ client.on('interactionCreate', async interaction => {
 
     await channel.send({ embeds: [embed] });
     await interaction.reply({ content: `✅ Announcement successfully broadcasted to ${channel}.`, ephemeral: true });
+  }
+
+  else if (commandName === 'update') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+      return interaction.reply({ content: '❌ You do not have permission to publish updates.', ephemeral: true });
+    }
+
+    const channel = interaction.options.getChannel('target_channel');
+    const messageContent = interaction.options.getString('message');
+
+    if (!channel.isTextBased()) {
+      return interaction.reply({ content: '❌ Target destination must be a valid text channel.', ephemeral: true });
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor('#5865F2')
+      .setTitle('📢 New Update')
+      .setDescription(messageContent)
+      .setFooter({ text: `Issued by ${interaction.user.tag}` })
+      .setTimestamp();
+
+    await channel.send({ embeds: [embed] });
+    await interaction.reply({ content: `✅ Update successfully broadcasted to ${channel}.`, ephemeral: true });
   }
 
   else if (commandName === 'poll') {
