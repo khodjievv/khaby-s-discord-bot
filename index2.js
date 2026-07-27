@@ -94,28 +94,11 @@ async function verifyAndAssignRole(guild, member, targetLevel) {
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
   
-  // Cache all existing invites and automatically sync legacy/pre-existing invite counts into Firebase so counts are never lost
+  // Cache all existing invites
   for (const [guildId, guild] of client.guilds.cache) {
     try {
       const firstInvites = await guild.invites.fetch();
       guildInvites.set(guildId, new Map(firstInvites.map(invite => [invite.code, invite.uses])));
-
-      // Sync pre-existing active invite codes into database counts
-      for (const [code, invite] of firstInvites) {
-        if (invite.inviter && invite.uses > 0) {
-          const inviterRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Invites/${guildId}/${invite.inviter.id}.json`;
-          const res = await fetch(inviterRef);
-          let data = await res.json() || { total: 0 };
-          if (data.total < invite.uses) {
-            data.total = invite.uses;
-            await fetch(inviterRef, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(data)
-            });
-          }
-        }
-      }
     } catch (err) {
       console.error(`Failed to fetch invites for guild ${guildId}:`, err);
     }
@@ -173,7 +156,7 @@ client.on('guildMemberAdd', async member => {
 
     let inviterText = "an unknown invite link or vanity URL";
     if (usedInvite && usedInvite.inviter) {
-      inviterText = `invitation by **@${usedInvite.inviter.tag}** (${usedInvite.code})`;
+      inviterText = `invitation by **@${usedInvite.inviter.username}**`;
       
       const inviterId = usedInvite.inviter.id;
       const inviteRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Invites/${member.guild.id}/${inviterId}.json`;
@@ -361,7 +344,7 @@ client.on('interactionCreate', async interaction => {
         userRank = `#${userIndex + 1}`;
       }
 
-      // Build leaderboard list matching the requested UI format
+      // Build leaderboard list matching the requested UI format with 🥇 🥈 🥉 emojis for top 3
       let listDesc = `You have invited **${userTotal}** users to this server.\nYou are currently **${userRank}** on the leaderboard.\n\n`;
 
       for (let i = 0; i < Math.min(sortedInvites.length, 10); i++) {
@@ -374,7 +357,13 @@ client.on('interactionCreate', async interaction => {
         } catch (e) {}
 
         const inviteWord = entry.total === 1 ? 'invite' : 'invites';
-        listDesc += `${rankNum}. ${userDisplay} — **${entry.total}** ${inviteWord}\n`;
+        
+        let prefix = `${rankNum}.`;
+        if (rankNum === 1) prefix = '🥇';
+        else if (rankNum === 2) prefix = '🥈';
+        else if (rankNum === 3) prefix = '🥉';
+
+        listDesc += `${prefix} ${userDisplay} — **${entry.total}** ${inviteWord}\n`;
       }
 
       if (sortedInvites.length === 0) {
