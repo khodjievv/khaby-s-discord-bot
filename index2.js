@@ -163,7 +163,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('serverinfo')
-    .setDescription('Displays high-level operational statistics for this community'),
+    .setDescription('Displays detailed high-level operational statistics for this community'),
 
   new SlashCommandBuilder()
     .setName('userinfo')
@@ -376,7 +376,8 @@ client.on('interactionCreate', async interaction => {
 
   if (commandName === 'speak') {
     const text = interaction.options.getString('text');
-    await interaction.reply({ content: text });
+    await interaction.channel.send(text);
+    await interaction.reply({ content: '✅ Message sent successfully.', ephemeral: true });
   }
 
   else if (commandName === 'announce') {
@@ -393,7 +394,7 @@ client.on('interactionCreate', async interaction => {
 
     const embed = new EmbedBuilder()
       .setColor('#5865F2')
-      .setTitle('📢 Server Announcement')
+      .setTitle('📢 Server Notice')
       .setDescription(content)
       .setFooter({ text: `Issued by ${interaction.user.tag}` })
       .setTimestamp();
@@ -879,18 +880,22 @@ client.on('interactionCreate', async interaction => {
   else if (commandName === 'serverinfo') {
     const { guild } = interaction;
     const owner = await guild.fetchOwner();
+    
+    const textChannels = guild.channels.cache.filter(c => c.type === 0).size; 
+    const voiceChannels = guild.channels.cache.filter(c => c.type === 2).size; 
 
     const infoEmbed = new EmbedBuilder()
       .setColor('#2b2d31')
-      .setTitle(`🛡️ ${guild.name} Overview`)
+      .setTitle(`🛡️ ${guild.name} Server Information`)
       .setThumbnail(guild.iconURL({ dynamic: true }))
       .addFields(
         { name: '👑 Guild Owner', value: `${owner.user.tag}`, inline: true },
-        { name: '👥 Total Members', value: `${guild.memberCount}`, inline: true },
-        { name: '🚀 Boost Level', value: `Level ${guild.premiumTier} (${guild.premiumSubscriptionCount || 0} boosts)`, inline: true },
-        { name: '📅 Creation Date', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: true },
-        { name: '💬 Total Channels', value: `${guild.channels.cache.size}`, inline: true },
-        { name: '🔒 Verification Tier', value: `${guild.verificationLevel}`, inline: true }
+        { name: '👥 Members', value: `**Total:** ${guild.memberCount}`, inline: true },
+        { name: '🚀 Boosts', value: `**Tier:** ${guild.premiumTier}\n**Count:** ${guild.premiumSubscriptionCount || 0} Boosts`, inline: true },
+        { name: '💬 Channels', value: `**Total:** ${guild.channels.cache.size}\n⌨️ Text: ${textChannels}\n🔊 Voice: ${voiceChannels}`, inline: true },
+        { name: '🎭 Roles', value: `${guild.roles.cache.size} roles`, inline: true },
+        { name: '😊 Emojis', value: `${guild.emojis.cache.size} emojis`, inline: true },
+        { name: '📅 Creation Date', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:F>\n(<t:${Math.floor(guild.createdTimestamp / 1000)}:R>)`, inline: false }
       )
       .setFooter({ text: `Guild ID: ${guild.id}` })
       .setTimestamp();
