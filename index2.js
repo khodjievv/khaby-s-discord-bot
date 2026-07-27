@@ -98,20 +98,28 @@ client.once('ready', async () => {
   }
 });
 
-// --- ROBUST DYNAMIC WELCOME EVENT ---
+// --- REAL-TIME DYNAMIC WELCOME CARD EVENT ---
 client.on('guildMemberAdd', async member => {
   try {
     const welcomeChannelId = '1530563110463738061';
     const channel = member.guild.channels.cache.get(welcomeChannelId);
     if (!channel) return;
 
-    const bannerImageUrl = 'https://cdn.discordapp.com/attachments/1530563110463738061/1531254594796130374/welcome.gif?ex=6a688b78&is=6a6739f8&hm=224112876ec3e21938c273ff065bbc3bac0b56435f401ceae759db0bd515ec5d'; 
+    // Pulling real-time member parameters to generate a live card with their username
+    const username = encodeURIComponent(member.user.username);
+    const avatar = member.user.displayAvatarURL({ extension: 'png', size: 256 });
+    const bgUrl = encodeURIComponent('https://cdn.discordapp.com/attachments/1530563110463738061/1531254594796130374/welcome.gif');
+    const guildName = encodeURIComponent(member.guild.name);
+    const memberCount = member.guild.memberCount;
+
+    // Generates a real-time card image embedding the user's specific info
+    const dynamicCardUrl = `https://v1.image.coolful.workers.dev/welcome?username=${username}&guild=${guildName}&memberCount=${memberCount}&avatar=${avatar}&background=${bgUrl}`;
 
     const welcomeEmbed = new EmbedBuilder()
       .setColor('#3498db')
       .setTitle(`🎉 Welcome to Khaby's Productions!`)
       .setDescription(`Hey ${member} (**${member.user.username}**), glad to have you here! Enjoy your stay.`)
-      .setImage(bannerImageUrl)
+      .setImage(dynamicCardUrl)
       .addFields(
         { name: '📊 Member Count', value: `${member.guild.memberCount} members`, inline: true },
         { name: '🆔 User ID', value: member.id, inline: true }
