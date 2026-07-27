@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits, ChannelType } = require('discord.js');
 const express = require('express');
 
 // Express server for Render keep-alive
@@ -341,10 +341,40 @@ client.on('interactionCreate', async interaction => {
     const helpReason = interaction.fields.getTextInputValue('ticket_description');
     const issueQuestion = interaction.fields.getTextInputValue('ticket_issue');
 
-    return interaction.reply({
-      content: `✅ Your ticket has been created successfully!\n\n**Help with:** ${helpReason}\n**Issue:** ${issueQuestion}`,
-      ephemeral: true
-    });
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      const ticketChannel = await interaction.guild.channels.create({
+        name: `ticket-${interaction.user.username}`,
+        type: ChannelType.GuildText,
+        permissionOverwrites: [
+          {
+            id: interaction.guild.id,
+            deny: [PermissionFlagsBits.ViewChannel],
+          },
+          {
+            id: interaction.user.id,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory],
+          },
+        ],
+      });
+
+      const ticketEmbed = new EmbedBuilder()
+        .setColor('#3498db')
+        .setTitle(`Ticket: ${interaction.user.tag}`)
+        .setDescription(`**Help with:** ${helpReason}\n**Issue/Question:** ${issueQuestion}`)
+        .setTimestamp();
+
+      await ticketChannel.send({ content: `${interaction.user} Support will be with you shortly!`, embeds: [ticketEmbed] });
+
+      return interaction.editReply({
+        content: `✅ Your ticket channel has been created successfully: ${ticketChannel}!`,
+      });
+    } catch (err) {
+      return interaction.editReply({
+        content: `❌ Failed to create ticket channel. Make sure the bot has 'Manage Channels' permissions!`,
+      });
+    }
   }
 
   if (!interaction.isChatInputCommand()) return;
