@@ -1,5 +1,6 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, AttachmentBuilder } = require('discord.js');
 const express = require('express');
+const canvafy = require('canvafy');
 
 // Express server for Render keep-alive
 const app = express();
@@ -231,6 +232,39 @@ client.once('ready', async () => {
   }
 });
 
+// --- DYNAMIC ANIMATED WELCOME EVENT ---
+client.on('guildMemberAdd', async member => {
+  try {
+    const welcomeChannelId = '1530563110463738061';
+    const channel = member.guild.channels.cache.get(welcomeChannelId);
+    if (!channel) return;
+
+    // Generate dynamic card using the newly joined member's exact data
+    const welcomeCard = await new canvafy.Security()
+      .setAvatar(member.user.displayAvatarURL({ forceStatic: false, extension: 'png' }))
+      .setBackground("image", "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop")
+      .setDiscriminator(member.user.discriminator || '0000')
+      .setUsername(member.user.username)
+      .setBorder("#3498db")
+      .setAvatarBorder("#3498db")
+      .setOverlayOpacity(0.5)
+      .build();
+
+    const attachment = new AttachmentBuilder(welcomeCard, { name: `welcome-${member.id}.gif` });
+
+    const welcomeEmbed = new EmbedBuilder()
+      .setColor('#3498db')
+      .setTitle(`Welcome to ${member.guild.name}!`)
+      .setDescription(`We hope you have a great time here, ${member}!`)
+      .setImage(`attachment://welcome-${member.id}.gif`)
+      .setTimestamp();
+
+    await channel.send({ embeds: [welcomeEmbed], files: [attachment] });
+  } catch (err) {
+    console.error('Animated welcome card error:', err);
+  }
+});
+
 client.on('messageCreate', async message => {
   if (message.author.bot) return;
 
@@ -319,13 +353,11 @@ client.on('interactionCreate', async interaction => {
       const res = await fetch(pollRef);
       let pollData = await res.json();
 
-      // Fallback: If poll data doesn't exist in Firebase yet, parse it from the embed description to recover safely
       if (!pollData && interaction.message.embeds[0]) {
         const embedDesc = interaction.message.embeds[0].description || '';
         const lines = embedDesc.split('\n');
         const queryText = lines[0] ? lines[0].replace(/\*\*/g, '') : 'Community Poll';
         
-        // Extract choices from the embed format: 🟢 [1] ChoiceA — `0` votes
         let choiceA = 'Choice 1';
         let choiceB = 'Choice 2';
         if (lines[2]) {
@@ -346,7 +378,6 @@ client.on('interactionCreate', async interaction => {
           voters: {}
         };
 
-        // Re-initialize it in Firebase so future votes work seamlessly
         await fetch(pollRef, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -482,7 +513,7 @@ client.on('interactionCreate', async interaction => {
       .setColor('#3498db')
       .setTitle('📊 Community Poll')
       .setDescription(`**${query}**\n\n🟢 **[1]** ${choiceA} — \`0\` votes\n🔵 **[2]** ${choiceB} — \`0\` votes`)
-      .setFooter({ text: `Ballot ID: ${pollId}` })
+      .setFooter({ text: `Poll ID: ${pollId}` })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed], components: [row] });
