@@ -393,7 +393,7 @@ client.on('interactionCreate', async interaction => {
 
     const embed = new EmbedBuilder()
       .setColor('#5865F2')
-      .setTitle('📢 Server Notice')
+      .setTitle('📢 Server Announcement')
       .setDescription(content)
       .setFooter({ text: `Issued by ${interaction.user.tag}` })
       .setTimestamp();
