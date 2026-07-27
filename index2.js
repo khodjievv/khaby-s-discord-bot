@@ -323,7 +323,7 @@ client.on('interactionCreate', async interaction => {
       if (!pollData && interaction.message.embeds[0]) {
         const embedDesc = interaction.message.embeds[0].description || '';
         const lines = embedDesc.split('\n');
-        const queryText = lines[0] ? lines[0].replace(/\*\*/g, '') : 'Community Ballot';
+        const queryText = lines[0] ? lines[0].replace(/\*\*/g, '') : 'Community Poll';
         
         // Extract choices from the embed format: 🟢 [1] ChoiceA — `0` votes
         let choiceA = 'Choice 1';
@@ -377,6 +377,7 @@ client.on('interactionCreate', async interaction => {
       });
 
       const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+        .setTitle('📊 Community Poll')
         .setDescription(`**${pollData.query}**\n\n🟢 **[1]** ${pollData.choice_a} — \`${v1}\` votes\n🔵 **[2]** ${pollData.choice_b} — \`${v2}\` votes`);
 
       await interaction.message.edit({ embeds: [updatedEmbed] });
@@ -479,7 +480,7 @@ client.on('interactionCreate', async interaction => {
 
     const embed = new EmbedBuilder()
       .setColor('#3498db')
-      .setTitle('📊 Community Ballot')
+      .setTitle('📊 Community Poll')
       .setDescription(`**${query}**\n\n🟢 **[1]** ${choiceA} — \`0\` votes\n🔵 **[2]** ${choiceB} — \`0\` votes`)
       .setFooter({ text: `Ballot ID: ${pollId}` })
       .setTimestamp();
