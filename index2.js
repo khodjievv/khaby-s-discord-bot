@@ -98,7 +98,7 @@ client.once('ready', async () => {
   }
 });
 
-// --- RELIABLE WELCOME EVENT ---
+// --- RELIABLE WELCOME EVENT WITH CHANNEL LINKS & EXPANDED DESCRIPTIONS ---
 client.on('guildMemberAdd', async member => {
   try {
     const welcomeChannelId = '1530563856466968576';
@@ -108,7 +108,7 @@ client.on('guildMemberAdd', async member => {
     const welcomeEmbed = new EmbedBuilder()
       .setColor('#3498db')
       .setTitle(`Welcome to Khaby's Utilities!`)
-      .setDescription(`Here's a few things you can do in our server!\n\n📄 | **Read rules before starting a conversation!**\n• #rules-info — Click me to read rules!\n\n💖 | **This server is a helpful community dedicated to custom bots, coding, and hanging out!**\n\n📜 | **Do not hesitate to ping a staff for any issues!**\nIf it's regarding bugs, staff report or anything else, create a ticket!\n🎟️ | #support — Click me to view support!\n\n⏳ | ... And thats basically it!\nLook around the server. You'll get it!`)
+      .setDescription(`Here's a few things you can do in our server!\n\n📄 | **Read rules before starting a conversation!**\n• <#1530563110463738058> — [Click me to read rules!](https://discord.com/channels/1530333292052611093/1530563110463738058)\n*Make sure to review our community guidelines to keep things safe, welcoming, and fun for everyone here.*\n\n💖 | **This server is a helpful community dedicated to custom bots, coding, and hanging out!**\n*Explore various utility projects, share your own code snippets, test out custom bot features, and chat with fellow developers and gamers.*\n\n📜 | **Do not hesitate to ping a staff for any issues!**\nIf it's regarding bugs, staff report, technical inquiries, or anything else, create a ticket!\n🎟️ | <#1530619595923128511> — [Click me to view support!](https://discord.com/channels/1530333292052611093/1530619595923128511)\n*Our support team is always active and ready to assist you with any problems you might encounter.*\n\n⏳ | **... And thats basically it!**\nLook around the server, participate in events, level up through chatting, and enjoy your stay. You'll get the hang of it in no time!`)
       .setImage('https://media.discordapp.net/attachments/1530563110463738061/1531256712491696208/khabywelcomes.png?ex=6a688d71&is=6a673bf1&hm=c48a8e9b541e61252b7430799a6330b621b245c89e161a65931048ac22a81514&=&format=webp&quality=lossless&width=1354&height=672')
       .setTimestamp();
 
@@ -277,8 +277,8 @@ client.on('interactionCreate', async interaction => {
       body: JSON.stringify({ item, participants: {}, status: 'active', endTime })
     });
 
-    const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`enter_gw_${giveawayId}`).setLabel('🎁 Enter Raffle').setStyle(ButtonStyle.Success));
-    const embed = new EmbedBuilder().setColor('#ff007f').setTitle('🎁 PRIZE RAFFLE').setDescription(`Prize: **${item}**\nWinners: **${slotCount}**\nCloses: <t:${Math.floor(endTime / 1000)}:R>`).setTimestamp(endTime);
+    const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`enter_gw_${giveawayId}`).setLabel('🎁 Enter Giveaway!').setStyle(ButtonStyle.Success));
+    const embed = new EmbedBuilder().setColor('#ff007f').setTitle('🎁 GIVEAWAY!').setDescription(`Prize: **${item}**\nWinners: **${slotCount}**\nCloses: <t:${Math.floor(endTime / 1000)}:R>`).setTimestamp(endTime);
 
     const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
 
