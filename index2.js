@@ -13,7 +13,7 @@ app.listen(PORT, () => {
   console.log(`Web server is running on port ${PORT}`);
 });
 
-// Discord Bot setup with GuildInvites intent enabled to track user invites
+// Discord Bot setup with GuildInvites intent enabled to track user invites accurately
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -36,15 +36,15 @@ const client = new Client({
 // Cache for tracking invite uses dynamically alongside database persistence
 const guildInvites = new Map();
 
-// Define Slash Commands globally (including the new /invites command)
+// Define Slash Commands globally (including the leaderboard /invites command)
 const commands = [
   new SlashCommandBuilder().setName('speak').setDescription('Sends plain text').addStringOption(o => o.setName('text').setDescription('Text').setRequired(true)),
   new SlashCommandBuilder().setName('announce').setDescription('Broadcasts notice').addChannelOption(o => o.setName('target_channel').setDescription('Channel').setRequired(true)).addStringOption(o => o.setName('content').setDescription('Body').setRequired(true)),
   new SlashCommandBuilder().setName('update').setDescription('Broadcasts update').addChannelOption(o => o.setName('target_channel').setDescription('Channel').setRequired(true)).addStringOption(o => o.setName('message').setDescription('Details').setRequired(true)),
   new SlashCommandBuilder().setName('poll').setDescription('Voting ballot').addStringOption(o => o.setName('query').setDescription('Topic').setRequired(true)).addStringOption(o => o.setName('choice_a').setDescription('Choice A').setRequired(true)).addStringOption(o => o.setName('choice_b').setDescription('Choice B').setRequired(true)),
-  new SlashCommandBuilder().setName('giveaway').setDescription('GIVEAWAY!').addStringOption(o => o.setName('item').setDescription('Prize').setRequired(true)).addIntegerOption(o => o.setName('slot_count').setDescription('Winners').setRequired(true)).addIntegerOption(o => o.setName('length_mins').setDescription('Minutes').setRequired(true)),
+  new SlashCommandBuilder().setName('giveaway').setDescription('Prize giveaway').addStringOption(o => o.setName('item').setDescription('Prize').setRequired(true)).addIntegerOption(o => o.setName('slot_count').setDescription('Winners').setRequired(true)).addIntegerOption(o => o.setName('length_mins').setDescription('Minutes').setRequired(true)),
   new SlashCommandBuilder().setName('coinflip').setDescription('Flips a coin'),
-  new SlashCommandBuilder().setName('invites').setDescription('Check invitation stats').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)),
+  new SlashCommandBuilder().setName('invites').setDescription('Check server invite leaderboard').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)),
   new SlashCommandBuilder().setName('rank').setDescription('Checks level and XP').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)),
   new SlashCommandBuilder().setName('leaderboard').setDescription('Top members leaderboard'),
   new SlashCommandBuilder().setName('setrank').setDescription('Admin rank set').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(true)).addIntegerOption(o => o.setName('level').setDescription('Level').setRequired(true)).addIntegerOption(o => o.setName('xp').setDescription('XP').setRequired(true)),
@@ -94,11 +94,28 @@ async function verifyAndAssignRole(guild, member, targetLevel) {
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
   
-  // Cache all existing invites across all guilds to retain old invite counts upon bot restarts/re-adds
+  // Cache all existing invites and automatically sync legacy/pre-existing invite counts into Firebase so counts are never lost
   for (const [guildId, guild] of client.guilds.cache) {
     try {
       const firstInvites = await guild.invites.fetch();
       guildInvites.set(guildId, new Map(firstInvites.map(invite => [invite.code, invite.uses])));
+
+      // Sync pre-existing active invite codes into database counts
+      for (const [code, invite] of firstInvites) {
+        if (invite.inviter && invite.uses > 0) {
+          const inviterRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Invites/${guildId}/${invite.inviter.id}.json`;
+          const res = await fetch(inviterRef);
+          let data = await res.json() || { total: 0 };
+          if (data.total < invite.uses) {
+            data.total = invite.uses;
+            await fetch(inviterRef, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+            });
+          }
+        }
+      }
     } catch (err) {
       console.error(`Failed to fetch invites for guild ${guildId}:`, err);
     }
@@ -138,7 +155,6 @@ client.on('guildMemberAdd', async member => {
     const welcomeChannelId = '1530563856466968576';
     const channel = member.guild.channels.cache.get(welcomeChannelId);
     
-    // Fetch current invites to find which one was used
     const newInvites = await member.guild.invites.fetch();
     const oldInvites = guildInvites.get(member.guild.id);
     let usedInvite = null;
@@ -153,14 +169,12 @@ client.on('guildMemberAdd', async member => {
       }
     }
 
-    // Update the cache with current invite uses
     guildInvites.set(member.guild.id, new Map(newInvites.map(inv => [inv.code, inv.uses])));
 
     let inviterText = "an unknown invite link or vanity URL";
     if (usedInvite && usedInvite.inviter) {
       inviterText = `invitation by **@${usedInvite.inviter.tag}** (${usedInvite.code})`;
       
-      // Update inviter stats in Firebase to persist history permanently
       const inviterId = usedInvite.inviter.id;
       const inviteRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Invites/${member.guild.id}/${inviterId}.json`;
       
@@ -328,27 +342,54 @@ client.on('interactionCreate', async interaction => {
   }
   else if (commandName === 'invites') {
     const targetUser = interaction.options.getUser('target_user') || interaction.user;
-    const inviteRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Invites/${interaction.guild.id}/${targetUser.id}.json`;
-
+    
     try {
-      const res = await fetch(inviteRef);
-      const data = await res.json() || { regular: 0, fake: 0, left: 0, total: 0 };
-      
+      const res = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/Invites/${interaction.guild.id}.json`);
+      const allInvites = await res.json() || {};
+
+      // Sort users by total invites descending
+      const sortedInvites = Object.entries(allInvites)
+        .map(([userId, data]) => ({ userId, total: data.total || 0 }))
+        .sort((a, b) => b.total - a.total);
+
+      let userTotal = 0;
+      let userRank = 'Unranked';
+
+      const userIndex = sortedInvites.findIndex(item => item.userId === targetUser.id);
+      if (userIndex !== -1) {
+        userTotal = sortedInvites[userIndex].total;
+        userRank = `#${userIndex + 1}`;
+      }
+
+      // Build leaderboard list matching the requested UI format
+      let listDesc = `You have invited **${userTotal}** users to this server.\nYou are currently **${userRank}** on the leaderboard.\n\n`;
+
+      for (let i = 0; i < Math.min(sortedInvites.length, 10); i++) {
+        const rankNum = i + 1;
+        const entry = sortedInvites[i];
+        let userDisplay = `<@${entry.userId}>`;
+        try {
+          const fetchedUsr = await client.users.fetch(entry.userId);
+          userDisplay = `@${fetchedUsr.username}`;
+        } catch (e) {}
+
+        const inviteWord = entry.total === 1 ? 'invite' : 'invites';
+        listDesc += `${rankNum}. ${userDisplay} — **${entry.total}** ${inviteWord}\n`;
+      }
+
+      if (sortedInvites.length === 0) {
+        listDesc += `*No invites recorded yet.*`;
+      }
+
       const embed = new EmbedBuilder()
         .setColor('#3498db')
-        .setTitle(`🎫 Invitation Statistics — ${targetUser.tag}`)
-        .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-        .addFields(
-          { name: '✅ Regular Invites', value: `${data.regular}`, inline: true },
-          { name: '❌ Left / Departed', value: `${data.left || 0}`, inline: true },
-          { name: '⚠️ Fake / Suspicious', value: `${data.fake || 0}`, inline: true },
-          { name: '📊 Total Valid Invites', value: `**${data.total}**`, inline: false }
-        )
+        .setTitle('Invite Leaderboard')
+        .setDescription(listDesc)
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
     } catch (e) {
-      await interaction.reply({ content: '❌ Could not fetch invite statistics.', ephemeral: true });
+      await interaction.reply({ content: '❌ Could not load invite leaderboard.', ephemeral: true });
     }
   }
   else if (commandName === 'poll') {
@@ -382,8 +423,8 @@ client.on('interactionCreate', async interaction => {
       body: JSON.stringify({ item, participants: {}, status: 'active', endTime })
     });
 
-    const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`enter_gw_${giveawayId}`).setLabel('🎁 Enter Giveaway!').setStyle(ButtonStyle.Success));
-    const embed = new EmbedBuilder().setColor('#ff007f').setTitle('🎁 GIVEAWAY').setDescription(`Prize: **${item}**\nWinners: **${slotCount}**\nCloses: <t:${Math.floor(endTime / 1000)}:R>`).setTimestamp(endTime);
+    const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`enter_gw_${giveawayId}`).setLabel('🎉 Enter Giveaway!').setStyle(ButtonStyle.Success));
+    const embed = new EmbedBuilder().setColor('#ff007f').setTitle('🎉 GIVEAWAY!').setDescription(`Prize: **${item}**\nWinners: **${slotCount}**\nCloses: <t:${Math.floor(endTime / 1000)}:R>`).setTimestamp(endTime);
 
     const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
 
@@ -401,7 +442,7 @@ client.on('interactionCreate', async interaction => {
           userIds.splice(idx, 1);
         }
 
-        const endedEmbed = new EmbedBuilder().setColor('#57F287').setTitle('🏆 RAFFLE ENDED').setDescription(`Winners:\n${winners.map(w => `• @${w}`).join('\n')}`).setTimestamp();
+        const endedEmbed = new EmbedBuilder().setColor('#57F287').setTitle('🏆 GIVEAWAY ENDED').setDescription(`Winners:\n${winners.map(w => `• @${w}`).join('\n')}`).setTimestamp();
         await msg.edit({ embeds: [endedEmbed], components: [] });
       } catch (e) {}
     }, lengthMins * 60 * 1000);
