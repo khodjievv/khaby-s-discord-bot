@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits } = require('discord.js');
 const express = require('express');
 
 // Express server for Render keep-alive
@@ -36,7 +36,7 @@ const client = new Client({
 // Cache for tracking invite uses dynamically alongside database persistence
 const guildInvites = new Map();
 
-// Define Slash Commands globally (including the leaderboard /invites command)
+// Define Slash Commands globally
 const commands = [
   new SlashCommandBuilder().setName('speak').setDescription('Sends plain text').addStringOption(o => o.setName('text').setDescription('Text').setRequired(true)),
   new SlashCommandBuilder().setName('announce').setDescription('Broadcasts notice').addChannelOption(o => o.setName('target_channel').setDescription('Channel').setRequired(true)).addStringOption(o => o.setName('content').setDescription('Body').setRequired(true)),
@@ -45,6 +45,7 @@ const commands = [
   new SlashCommandBuilder().setName('giveaway').setDescription('Prize giveaway').addStringOption(o => o.setName('item').setDescription('Prize').setRequired(true)).addIntegerOption(o => o.setName('slot_count').setDescription('Winners').setRequired(true)).addIntegerOption(o => o.setName('length_mins').setDescription('Minutes').setRequired(true)),
   new SlashCommandBuilder().setName('coinflip').setDescription('Flips a coin'),
   new SlashCommandBuilder().setName('invites').setDescription('Check server invite leaderboard').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)),
+  new SlashCommandBuilder().setName('ticketpanel').setDescription('Sends the support ticket panel').addChannelOption(o => o.setName('target_channel').setDescription('Channel to send panel').setRequired(true)),
   new SlashCommandBuilder().setName('rank').setDescription('Checks level and XP').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)),
   new SlashCommandBuilder().setName('leaderboard').setDescription('Top members leaderboard'),
   new SlashCommandBuilder().setName('setrank').setDescription('Admin rank set').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(true)).addIntegerOption(o => o.setName('level').setDescription('Level').setRequired(true)).addIntegerOption(o => o.setName('xp').setDescription('XP').setRequired(true)),
@@ -271,6 +272,33 @@ client.on('interactionCreate', async interaction => {
   if (interaction.isButton()) {
     const customId = interaction.customId;
 
+    if (customId === 'open_ticket_modal') {
+      const modal = new ModalBuilder()
+        .setCustomId('ticket_submission_modal')
+        .setTitle('User Support');
+
+      const descInput = new TextInputBuilder()
+        .setCustomId('ticket_description')
+        .setLabel('What do you need help with?')
+        .setPlaceholder('Be descriptive')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true);
+
+      const issueInput = new TextInputBuilder()
+        .setCustomId('ticket_issue')
+        .setLabel('What is your issue/question?')
+        .setPlaceholder('Ask away!')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(descInput),
+        new ActionRowBuilder().addComponents(issueInput)
+      );
+
+      return interaction.showModal(modal);
+    }
+
     if (customId.startsWith('vote_')) {
       const [, pollId, optionNum] = customId.split('_');
       const pollRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Polls/${pollId}.json`;
@@ -309,6 +337,16 @@ client.on('interactionCreate', async interaction => {
     return;
   }
 
+  if (interaction.isModalSubmit() && interaction.customId === 'ticket_submission_modal') {
+    const helpReason = interaction.fields.getTextInputValue('ticket_description');
+    const issueQuestion = interaction.fields.getTextInputValue('ticket_issue');
+
+    return interaction.reply({
+      content: `✅ Your ticket has been created successfully!\n\n**Help with:** ${helpReason}\n**Issue:** ${issueQuestion}`,
+      ephemeral: true
+    });
+  }
+
   if (!interaction.isChatInputCommand()) return;
   const { commandName } = interaction;
 
@@ -323,6 +361,26 @@ client.on('interactionCreate', async interaction => {
     await channel.send({ embeds: [embed] });
     await interaction.reply({ content: '✅ Broadcasted', ephemeral: true });
   }
+  else if (commandName === 'ticketpanel') {
+    const channel = interaction.options.getChannel('target_channel');
+
+    const embed = new EmbedBuilder()
+      .setColor('#3498db')
+      .setTitle('❓ Support')
+      .setDescription('Do you have any questions regarding the server or game?\nCreate a ticket here and our moderators will help you!\n\nPlease keep in mind that creating joke tickets is against the rules.')
+      .setFooter({ text: 'Official Ticket Tool Partner' });
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('open_ticket_modal')
+        .setLabel('Create ticket')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('📥')
+    );
+
+    await channel.send({ embeds: [embed], components: [row] });
+    return interaction.reply({ content: '✅ Ticket panel sent successfully!', ephemeral: true });
+  }
   else if (commandName === 'invites') {
     const targetUser = interaction.options.getUser('target_user') || interaction.user;
     
@@ -330,7 +388,6 @@ client.on('interactionCreate', async interaction => {
       const res = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/Invites/${interaction.guild.id}.json`);
       const allInvites = await res.json() || {};
 
-      // Sort users by total invites descending
       const sortedInvites = Object.entries(allInvites)
         .map(([userId, data]) => ({ userId, total: data.total || 0 }))
         .sort((a, b) => b.total - a.total);
@@ -344,7 +401,6 @@ client.on('interactionCreate', async interaction => {
         userRank = `#${userIndex + 1}`;
       }
 
-      // Build leaderboard list matching the requested UI format with 🥇 🥈 🥉 emojis for top 3
       let listDesc = `You have invited **${userTotal}** users to this server.\nYou are currently **${userRank}** on the leaderboard.\n\n`;
 
       for (let i = 0; i < Math.min(sortedInvites.length, 10); i++) {
