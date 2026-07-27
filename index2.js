@@ -317,7 +317,42 @@ client.on('interactionCreate', async interaction => {
       const pollRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Polls/${pollId}.json`;
       
       const res = await fetch(pollRef);
-      const pollData = await res.json();
+      let pollData = await res.json();
+
+      // Fallback: If poll data doesn't exist in Firebase yet, parse it from the embed description to recover safely
+      if (!pollData && interaction.message.embeds[0]) {
+        const embedDesc = interaction.message.embeds[0].description || '';
+        const lines = embedDesc.split('\n');
+        const queryText = lines[0] ? lines[0].replace(/\*\*/g, '') : 'Community Ballot';
+        
+        // Extract choices from the embed format: 🟢 [1] ChoiceA — `0` votes
+        let choiceA = 'Choice 1';
+        let choiceB = 'Choice 2';
+        if (lines[2]) {
+          const matchA = lines[2].match(/\]\s+(.*?)\s+—/);
+          if (matchA) choiceA = matchA[1];
+        }
+        if (lines[3]) {
+          const matchB = lines[3].match(/\]\s+(.*?)\s+—/);
+          if (matchB) choiceB = matchB[1];
+        }
+
+        pollData = {
+          query: queryText,
+          choice_a: choiceA,
+          choice_b: choiceB,
+          votes1: 0,
+          votes2: 0,
+          voters: {}
+        };
+
+        // Re-initialize it in Firebase so future votes work seamlessly
+        await fetch(pollRef, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(pollData)
+        });
+      }
 
       if (!pollData) {
         return interaction.reply({ content: '❌ This poll instance is no longer valid.', ephemeral: true });
@@ -394,7 +429,7 @@ client.on('interactionCreate', async interaction => {
 
     const embed = new EmbedBuilder()
       .setColor('#5865F2')
-      .setTitle('📢 Server Notice')
+      .setTitle('📢 Server Announcement')
       .setDescription(content)
       .setFooter({ text: `Issued by ${interaction.user.tag}` })
       .setTimestamp();
