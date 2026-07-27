@@ -77,6 +77,30 @@ const commands = [
     .setDescription('Displays the top server members ranked by level and XP'),
 
   new SlashCommandBuilder()
+    .setName('setrank')
+    .setDescription('Admin command to set a specific user level and XP amount')
+    .addUserOption(option => option.setName('target_user').setDescription('Member to modify').setRequired(true))
+    .addIntegerOption(option => option.setName('level').setDescription('Target level (1 to 20)').setRequired(true))
+    .addIntegerOption(option => option.setName('xp').setDescription('Target XP amount').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('removerank')
+    .setDescription('Admin command to reset a user back to level 1 and 0 XP')
+    .addUserOption(option => option.setName('target_user').setDescription('Member to reset rank for').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('givexp')
+    .setDescription('Admin command to grant custom XP to a server member')
+    .addUserOption(option => option.setName('target_user').setDescription('Member to reward XP to').setRequired(true))
+    .addIntegerOption(option => option.setName('amount').setDescription('Amount of XP to add').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('givelvl')
+    .setDescription('Admin command to advance a member by a specific number of levels')
+    .addUserOption(option => option.setName('target_user').setDescription('Member to promote').setRequired(true))
+    .addIntegerOption(option => option.setName('number_of_level').setDescription('How many levels to add').setRequired(true)),
+
+  new SlashCommandBuilder()
     .setName('dm')
     .setDescription('Dispatches a private message to a member within this server')
     .addUserOption(option => option.setName('recipient').setDescription('The target guild user').setRequired(true))
@@ -147,6 +171,42 @@ function getXpRequiredForLevel(level) {
   return Math.floor(100 * Math.pow(level, 1.6));
 }
 
+// Helper to verify and handle level role rewards (1 to 20), removing previous lower tier roles
+async function verifyAndAssignRole(guild, member, targetLevel) {
+  if (!member) return;
+  const roleName = `Level ${targetLevel}`;
+  let role = guild.roles.cache.find(r => r.name === roleName);
+
+  if (!role) {
+    try {
+      role = await guild.roles.create({
+        name: roleName,
+        color: '#3498db',
+        reason: 'Automated Level Reward Role'
+      });
+    } catch (e) {
+      console.error('Failed to create level role automatically:', e);
+      return;
+    }
+  }
+
+  if (role) {
+    try {
+      for (let i = 1; i <= 20; i++) {
+        const checkRole = guild.roles.cache.find(r => r.name === `Level ${i}`);
+        if (checkRole && member.roles.cache.has(checkRole.id) && i !== targetLevel) {
+          await member.roles.remove(checkRole);
+        }
+      }
+      if (!member.roles.cache.has(role.id)) {
+        await member.roles.add(role);
+      }
+    } catch (e) {
+      console.error('Failed to update level roles for member:', e);
+    }
+  }
+}
+
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
@@ -193,48 +253,11 @@ client.on('messageCreate', async message => {
     const res = await fetch(userRef);
     let userData = await res.json() || { xp: 0, level: 1, messages: 0 };
 
-    // Helper to verify and handle level role rewards (1 to 20), removing previous lower tier roles
-    async function verifyAndAssignRole(targetLevel) {
-      const roleName = `Level ${targetLevel}`;
-      let role = message.guild.roles.cache.find(r => r.name === roleName);
-
-      if (!role) {
-        try {
-          role = await message.guild.roles.create({
-            name: roleName,
-            color: '#3498db',
-            reason: 'Automated Level Reward Role'
-          });
-        } catch (e) {
-          console.error('Failed to create level role automatically:', e);
-          return;
-        }
-      }
-
-      if (role && message.member) {
-        try {
-          for (let i = 1; i < targetLevel; i++) {
-            const oldRole = message.guild.roles.cache.find(r => r.name === `Level ${i}`);
-            if (oldRole && message.member.roles.cache.has(oldRole.id)) {
-              await message.member.roles.remove(oldRole);
-            }
-          }
-          if (!message.member.roles.cache.has(role.id)) {
-            await message.member.roles.add(role);
-          }
-        } catch (e) {
-          console.error('Failed to assign level role to user:', e);
-        }
-      }
-    }
-
-    // Give Level 1 role right away if checking a user profile initialized at level 1 without roles
     if (userData.level === 1) {
-      await verifyAndAssignRole(1);
+      await verifyAndAssignRole(message.guild, message.member, 1);
     }
 
     if (userData.level < 20) {
-      // XP scales based on writing more text characters (capped to prevent raw spam)
       const textLength = message.content.trim().length;
       const earnedXp = Math.min(Math.max(Math.floor(textLength / 6), 1), 40);
 
@@ -262,8 +285,7 @@ client.on('messageCreate', async message => {
       });
 
       if (leveledUp) {
-        await verifyAndAssignRole(userData.level);
-
+        await verifyAndAssignRole(message.guild, message.member, userData.level);
         const assignedRole = message.guild.roles.cache.find(r => r.name === `Level ${userData.level}`);
 
         const levelEmbed = new EmbedBuilder()
@@ -538,6 +560,148 @@ client.on('interactionCreate', async interaction => {
       await interaction.reply({ embeds: [lbEmbed] });
     } catch (err) {
       await interaction.reply({ content: '❌ Failed to fetch leaderboard data.', ephemeral: true });
+    }
+  }
+
+  else if (commandName === 'setrank') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: '❌ Administrator permissions are required to use /setrank.', ephemeral: true });
+    }
+
+    const targetUser = interaction.options.getUser('target_user');
+    const newLevel = Math.min(Math.max(interaction.options.getInteger('level'), 1), 20);
+    const newXp = interaction.options.getInteger('xp');
+    const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Levels/${targetUser.id}.json`;
+
+    try {
+      const res = await fetch(userRef);
+      let userData = await res.json() || { messages: 0 };
+      userData.level = newLevel;
+      userData.xp = newXp;
+
+      await fetch(userRef, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+
+      const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+      if (member) {
+        await verifyAndAssignRole(interaction.guild, member, newLevel);
+      }
+
+      await interaction.reply({ content: `✅ Successfully configured rank for **${targetUser.tag}**: Level **${newLevel}** with **${newXp} XP**.` });
+    } catch (err) {
+      await interaction.reply({ content: '❌ Failed to update user rank profile.', ephemeral: true });
+    }
+  }
+
+  else if (commandName === 'removerank') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: '❌ Administrator permissions are required to use /removerank.', ephemeral: true });
+    }
+
+    const targetUser = interaction.options.getUser('target_user');
+    const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Levels/${targetUser.id}.json`;
+
+    try {
+      const res = await fetch(userRef);
+      let userData = await res.json() || { messages: 0 };
+      userData.level = 1;
+      userData.xp = 0;
+
+      await fetch(userRef, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+
+      const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+      if (member) {
+        await verifyAndAssignRole(interaction.guild, member, 1);
+      }
+
+      await interaction.reply({ content: `🔄 Successfully reset rank profile for **${targetUser.tag}** back to Level 1 and 0 XP.` });
+    } catch (err) {
+      await interaction.reply({ content: '❌ Failed to reset user rank data.', ephemeral: true });
+    }
+  }
+
+  else if (commandName === 'givexp') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: '❌ Administrator permissions are required to use /givexp.', ephemeral: true });
+    }
+
+    const targetUser = interaction.options.getUser('target_user');
+    const xpAmount = interaction.options.getInteger('amount');
+    const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Levels/${targetUser.id}.json`;
+
+    try {
+      const res = await fetch(userRef);
+      let userData = await res.json() || { xp: 0, level: 1, messages: 0 };
+
+      userData.xp += xpAmount;
+      let xpNeeded = getXpRequiredForLevel(userData.level);
+      let leveledUp = false;
+
+      while (userData.xp >= xpNeeded && userData.level < 20) {
+        userData.xp -= xpNeeded;
+        userData.level += 1;
+        leveledUp = true;
+        xpNeeded = getXpRequiredForLevel(userData.level);
+      }
+
+      if (userData.level >= 20) {
+        userData.xp = 0;
+      }
+
+      await fetch(userRef, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+
+      const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+      if (leveledUp && member) {
+        await verifyAndAssignRole(interaction.guild, member, userData.level);
+      }
+
+      await interaction.reply({ content: `✨ Granted **${xpAmount} XP** to **${targetUser.tag}**! (Current Level: ${userData.level}, XP: ${userData.xp})` });
+    } catch (err) {
+      await interaction.reply({ content: '❌ Failed to grant XP to user.', ephemeral: true });
+    }
+  }
+
+  else if (commandName === 'givelvl') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: '❌ Administrator permissions are required to use /givelvl.', ephemeral: true });
+    }
+
+    const targetUser = interaction.options.getUser('target_user');
+    const levelsToAdd = interaction.options.getInteger('number_of_level');
+    const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Levels/${targetUser.id}.json`;
+
+    try {
+      const res = await fetch(userRef);
+      let userData = await res.json() || { xp: 0, level: 1, messages: 0 };
+
+      userData.level = Math.min(userData.level + levelsToAdd, 20);
+      if (userData.level >= 20) userData.xp = 0;
+
+      await fetch(userRef, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+
+      const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+      if (member) {
+        await verifyAndAssignRole(interaction.guild, member, userData.level);
+      }
+
+      await interaction.reply({ content: `⬆️ Advanced **${targetUser.tag}** up by **${levelsToAdd}** level(s)! They are now at **Level ${userData.level}**.` });
+    } catch (err) {
+      await interaction.reply({ content: '❌ Failed to promote user level.', ephemeral: true });
     }
   }
 
