@@ -110,7 +110,7 @@ client.on('guildMemberAdd', async member => {
       .setTitle(`🎉 Welcome to Khaby's Productions!`)
       .setDescription(`Hey ${member} (**${member.user.tag}**), glad to have you here! Enjoy your stay.`)
       .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
-      .setImage('https://cdn.discordapp.com/attachments/1530563110463738061/1531254594796130374/welcome.gif')
+      .setImage('https://media.discordapp.net/attachments/1530563110463738061/1531256712491696208/khabywelcomes.png?ex=6a688d71&is=6a673bf1&hm=c48a8e9b541e61252b7430799a6330b621b245c89e161a65931048ac22a81514&=&format=webp&quality=lossless&width=1354&height=672')
       .addFields(
         { name: '📊 Member Count', value: `${member.guild.memberCount} members`, inline: true },
         { name: '🆔 User ID', value: member.id, inline: true }
