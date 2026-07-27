@@ -68,6 +68,15 @@ const commands = [
     .setDescription('Flips a virtual currency to test your luck'),
 
   new SlashCommandBuilder()
+    .setName('rank')
+    .setDescription('Checks your current level, XP progress, and total message count')
+    .addUserOption(option => option.setName('target_user').setDescription('Member to check profile for').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('leaderboard')
+    .setDescription('Displays the top server members ranked by level and XP'),
+
+  new SlashCommandBuilder()
     .setName('dm')
     .setDescription('Dispatches a private message to a member within this server')
     .addUserOption(option => option.setName('recipient').setDescription('The target guild user').setRequired(true))
@@ -132,13 +141,18 @@ const commands = [
     .addUserOption(option => option.setName('target_user').setDescription('Member to inspect').setRequired(false))
 ].map(command => command.toJSON());
 
+// XP Calculation Helper: Exponential scaling curve up to Level 20
+function getXpRequiredForLevel(level) {
+  if (level >= 20) return Infinity; 
+  return Math.floor(100 * Math.pow(level, 1.6));
+}
+
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
   const activeToken = "MTUzMDK5MDY4Mjc3OTY4NDkyNA.GEbSTD.371dgOaGFjC4cNJXor1FyX_trpKAYLu6N5A0yU";
   const rest = new REST({ version: '10' }).setToken(activeToken);
   
-  // Registers commands globally across all servers the bot is in
   try {
     console.log('Started refreshing global (/) commands.');
     await rest.put(
@@ -154,6 +168,7 @@ client.once('ready', async () => {
 client.on('messageCreate', async message => {
   if (message.author.bot) return;
 
+  // Handle DM Logging
   if (!message.guild) {
     const auditLogChannelId = '1430151280092905666'; 
     const auditChannel = client.channels.cache.get(auditLogChannelId);
@@ -168,6 +183,88 @@ client.on('messageCreate', async message => {
       .setTimestamp();
 
     await auditChannel.send({ embeds: [auditEmbed] });
+    return;
+  }
+
+  // --- LEVELING & XP SYSTEM (Text-Length Based) ---
+  const userId = message.author.id;
+  const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Levels/${userId}.json`;
+
+  try {
+    const res = await fetch(userRef);
+    let userData = await res.json() || { xp: 0, level: 1, messages: 0 };
+
+    if (userData.level < 20) {
+      // Award XP proportional to message length (capped to prevent raw spam exploits)
+      const textLength = message.content.trim().length;
+      const earnedXp = Math.min(Math.max(Math.floor(textLength / 5), 2), 50);
+
+      userData.xp += earnedXp;
+      userData.messages = (userData.messages || 0) + 1;
+
+      let xpNeeded = getXpRequiredForLevel(userData.level);
+      let leveledUp = false;
+
+      while (userData.xp >= xpNeeded && userData.level < 20) {
+        userData.xp -= xpNeeded;
+        userData.level += 1;
+        leveledUp = true;
+        xpNeeded = getXpRequiredForLevel(userData.level);
+      }
+
+      if (userData.level >= 20) {
+        userData.xp = 0; 
+      }
+
+      await fetch(userRef, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+
+      // Handle Role Rewards for Levels 1 through 20
+      if (leveledUp) {
+        const roleName = `Level ${userData.level}`;
+        let role = message.guild.roles.cache.find(r => r.name === roleName);
+
+        if (!role) {
+          try {
+            role = await message.guild.roles.create({
+              name: roleName,
+              color: '#3498db',
+              reason: 'Automated Level Reward Role'
+            });
+          } catch (e) {
+            console.error('Failed to create level role automatically:', e);
+          }
+        }
+
+        if (role) {
+          try {
+            // Remove previous level roles to keep only the highest active role
+            for (let i = 1; i < userData.level; i++) {
+              const oldRole = message.guild.roles.cache.find(r => r.name === `Level ${i}`);
+              if (oldRole && message.member.roles.cache.has(oldRole.id)) {
+                await message.member.roles.remove(oldRole);
+              }
+            }
+            await message.member.roles.add(role);
+          } catch (e) {
+            console.error('Failed to assign level role to user:', e);
+          }
+        }
+
+        const levelEmbed = new EmbedBuilder()
+          .setColor('#00ffcc')
+          .setTitle('🎉 Level Up!')
+          .setDescription(`Congratulations ${message.author}, you advanced to **Level ${userData.level}**! ${role ? `\n🎁 Unlocked Role: **${role.name}**` : ''}`)
+          .setTimestamp();
+
+        await message.channel.send({ embeds: [levelEmbed] });
+      }
+    }
+  } catch (err) {
+    console.error('Leveling system error:', err);
   }
 });
 
@@ -182,7 +279,6 @@ client.on('interactionCreate', async interaction => {
       const res = await fetch(pollRef);
       let pollData = await res.json();
 
-      // Fallback: If Firebase entry expired or failed, reconstruct data from embed fields safely
       if (!pollData) {
         const embed = interaction.message.embeds[0];
         if (embed && embed.description) {
@@ -216,7 +312,6 @@ client.on('interactionCreate', async interaction => {
       if (optionNum === '1') v1++;
       if (optionNum === '2') v2++;
 
-      // Use PUT to ensure fields like choice_a and choice_b are never dropped or overwritten as undefined
       await fetch(pollRef, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -395,6 +490,71 @@ client.on('interactionCreate', async interaction => {
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
+  }
+
+  else if (commandName === 'rank') {
+    const targetUser = interaction.options.getUser('target_user') || interaction.user;
+    const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Levels/${targetUser.id}.json`;
+
+    try {
+      const res = await fetch(userRef);
+      const data = await res.json() || { xp: 0, level: 1, messages: 0 };
+      const xpNeeded = getXpRequiredForLevel(data.level);
+
+      const rankEmbed = new EmbedBuilder()
+        .setColor('#5865F2')
+        .setTitle(`📊 Level Profile — ${targetUser.username}`)
+        .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+        .addFields(
+          { name: '🏆 Level', value: `${data.level} / 20`, inline: true },
+          { name: '✨ Current XP', value: `${data.xp} / ${data.level >= 20 ? 'MAX' : xpNeeded}`, inline: true },
+          { name: '💬 Total Messages', value: `${data.messages || 0}`, inline: true }
+        )
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [rankEmbed] });
+    } catch (err) {
+      await interaction.reply({ content: '❌ Could not retrieve rank details at the moment.', ephemeral: true });
+    }
+  }
+
+  else if (commandName === 'leaderboard') {
+    try {
+      const res = await fetch('https://donate-modded-2b27d-default-rtdb.firebaseio.com/Levels.json');
+      const allData = await res.json();
+
+      if (!allData) {
+        return interaction.reply({ content: '❌ No leveling data recorded in the database yet.', ephemeral: true });
+      }
+
+      const sortedUsers = Object.entries(allData)
+        .map(([id, info]) => ({ id, ...info }))
+        .sort((a, b) => b.level - a.level || b.xp - a.xp)
+        .slice(0, 10);
+
+      let description = '';
+      for (let i = 0; i < sortedUsers.length; i++) {
+        const userEntry = sortedUsers[i];
+        let username = `User ID: ${userEntry.id}`;
+        try {
+          const fetchedUser = await client.users.fetch(userEntry.id);
+          username = fetchedUser.tag;
+        } catch (e) {}
+
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**#${i + 1}**`;
+        description += `${medal} **${username}** — Level **${userEntry.level}** (${userEntry.xp} XP)\n`;
+      }
+
+      const lbEmbed = new EmbedBuilder()
+        .setColor('#f1c40f')
+        .setTitle('🏆 Server Level Leaderboard (Top 10)')
+        .setDescription(description)
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [lbEmbed] });
+    } catch (err) {
+      await interaction.reply({ content: '❌ Failed to fetch leaderboard data.', ephemeral: true });
+    }
   }
 
   else if (commandName === 'dm') {
@@ -581,5 +741,5 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// Secure login using hardcoded token string
 client.login("MTUzMDK5MDY4Mjc3OTY4NDkyNA.GEbSTD.371dgOaGFjC4cNJXor1FyX_trpKAYLu6N5A0yU");
+
