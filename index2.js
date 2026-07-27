@@ -105,11 +105,13 @@ client.on('guildMemberAdd', async member => {
     const channel = member.guild.channels.cache.get(welcomeChannelId);
     if (!channel) return;
 
+    const bannerImageUrl = 'https://cdn.discordapp.com/attachments/1530563110463738061/1531254594796130374/welcome.gif?ex=6a688b78&is=6a6739f8&hm=224112876ec3e21938c273ff065bbc3bac0b56435f401ceae759db0bd515ec5d'; 
+
     const welcomeEmbed = new EmbedBuilder()
       .setColor('#3498db')
-      .setTitle(`🎉 Welcome to ${member.guild.name}!`)
-      .setDescription(`Hey ${member} (**${member.user.tag}**), glad to have you here! Enjoy your stay.`)
-      .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 }))
+      .setTitle(`🎉 Welcome to Khaby's Productions!`)
+      .setDescription(`Hey ${member} (**${member.user.username}**), glad to have you here! Enjoy your stay.`)
+      .setImage(bannerImageUrl)
       .addFields(
         { name: '📊 Member Count', value: `${member.guild.memberCount} members`, inline: true },
         { name: '🆔 User ID', value: member.id, inline: true }
@@ -328,7 +330,6 @@ client.on('interactionCreate', async interaction => {
     await interaction.reply({ embeds: [new EmbedBuilder().setTitle('🏆 Leaderboard').setDescription(desc)] });
   }
   else if (['setrank', 'removerank', 'givexp', 'givelvl', 'ban', 'unban', 'kick', 'warn', 'timeout', 'giverole', 'takerole', 'dm', 'dmid'].includes(commandName)) {
-    // Admin & utility shortcuts handled securely
     await interaction.reply({ content: `✅ Command executed successfully.`, ephemeral: true });
   }
   else if (commandName === 'serverinfo') {
