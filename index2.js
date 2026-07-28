@@ -33,36 +33,39 @@ const client = new Client({
   }
 });
 
+// Allowed Role ID configuration
+const ALLOWED_ROLE_ID = '1530637234317820095';
+
 // Cache for tracking invite uses dynamically alongside database persistence
 const guildInvites = new Map();
 
-// Define Slash Commands globally
+// Define Slash Commands globally with strict permission locks so unauthorized users cannot see them
 const commands = [
-  new SlashCommandBuilder().setName('speak').setDescription('Sends plain text').addStringOption(o => o.setName('text').setDescription('Text').setRequired(true)),
-  new SlashCommandBuilder().setName('announce').setDescription('Broadcasts notice').addChannelOption(o => o.setName('target_channel').setDescription('Channel').setRequired(true)).addStringOption(o => o.setName('content').setDescription('Body').setRequired(true)),
-  new SlashCommandBuilder().setName('update').setDescription('Broadcasts update').addChannelOption(o => o.setName('target_channel').setDescription('Channel').setRequired(true)).addStringOption(o => o.setName('message').setDescription('Details').setRequired(true)),
-  new SlashCommandBuilder().setName('poll').setDescription('Voting ballot').addStringOption(o => o.setName('query').setDescription('Topic').setRequired(true)).addStringOption(o => o.setName('choice_a').setDescription('Choice A').setRequired(true)).addStringOption(o => o.setName('choice_b').setDescription('Choice B').setRequired(true)),
-  new SlashCommandBuilder().setName('giveaway').setDescription('Prize giveaway').addStringOption(o => o.setName('item').setDescription('Prize').setRequired(true)).addIntegerOption(o => o.setName('slot_count').setDescription('Winners').setRequired(true)).addIntegerOption(o => o.setName('length_mins').setDescription('Minutes').setRequired(true)),
-  new SlashCommandBuilder().setName('coinflip').setDescription('Flips a coin'),
-  new SlashCommandBuilder().setName('invites').setDescription('Check server invite leaderboard').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)),
-  new SlashCommandBuilder().setName('ticketpanel').setDescription('Sends the support ticket panel').addChannelOption(o => o.setName('target_channel').setDescription('Channel to send panel').setRequired(true)),
-  new SlashCommandBuilder().setName('rank').setDescription('Checks level and XP').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)),
-  new SlashCommandBuilder().setName('leaderboard').setDescription('Top members leaderboard'),
-  new SlashCommandBuilder().setName('setrank').setDescription('Admin rank set').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(true)).addIntegerOption(o => o.setName('level').setDescription('Level').setRequired(true)).addIntegerOption(o => o.setName('xp').setDescription('XP').setRequired(true)),
-  new SlashCommandBuilder().setName('removerank').setDescription('Reset rank').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(true)),
-  new SlashCommandBuilder().setName('givexp').setDescription('Add XP').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(true)).addIntegerOption(o => o.setName('amount').setDescription('Amount').setRequired(true)),
-  new SlashCommandBuilder().setName('givelvl').setDescription('Add levels').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(true)).addIntegerOption(o => o.setName('number_of_level').setDescription('Levels').setRequired(true)),
-  new SlashCommandBuilder().setName('dm').setDescription('Send DM').addUserOption(o => o.setName('recipient').setDescription('User').setRequired(true)).addStringOption(o => o.setName('msg').setDescription('Text').setRequired(true)),
-  new SlashCommandBuilder().setName('dmid').setDescription('Send DM by ID').addStringOption(o => o.setName('account_id').setDescription('ID').setRequired(true)).addStringOption(o => o.setName('msg').setDescription('Text').setRequired(true)),
-  new SlashCommandBuilder().setName('giverole').setDescription('Give role').addUserOption(o => o.setName('member').setDescription('User').setRequired(true)).addRoleOption(o => o.setName('role_target').setDescription('Role').setRequired(true)),
-  new SlashCommandBuilder().setName('takerole').setDescription('Take role').addUserOption(o => o.setName('member').setDescription('User').setRequired(true)).addRoleOption(o => o.setName('role_target').setDescription('Role').setRequired(true)),
-  new SlashCommandBuilder().setName('ban').setDescription('Ban member').addUserOption(o => o.setName('violator').setDescription('User').setRequired(true)).addStringOption(o => o.setName('justification').setDescription('Reason').setRequired(false)),
-  new SlashCommandBuilder().setName('unban').setDescription('Unban member').addStringOption(o => o.setName('account_id').setDescription('ID').setRequired(true)).addStringOption(o => o.setName('justification').setDescription('Reason').setRequired(false)),
-  new SlashCommandBuilder().setName('kick').setDescription('Kick member').addUserOption(o => o.setName('violator').setDescription('User').setRequired(true)).addStringOption(o => o.setName('justification').setDescription('Reason').setRequired(false)),
-  new SlashCommandBuilder().setName('warn').setDescription('Warn member').addUserOption(o => o.setName('violator').setDescription('User').setRequired(true)).addStringOption(o => o.setName('justification').setDescription('Reason').setRequired(true)),
-  new SlashCommandBuilder().setName('timeout').setDescription('Timeout member').addUserOption(o => o.setName('violator').setDescription('User').setRequired(true)).addIntegerOption(o => o.setName('mins').setDescription('Mins').setRequired(true)).addStringOption(o => o.setName('justification').setDescription('Reason').setRequired(false)),
-  new SlashCommandBuilder().setName('serverinfo').setDescription('Server details'),
-  new SlashCommandBuilder().setName('userinfo').setDescription('User profile details').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false))
+  new SlashCommandBuilder().setName('speak').setDescription('Sends plain text').addStringOption(o => o.setName('text').setDescription('Text').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+  new SlashCommandBuilder().setName('announce').setDescription('Broadcasts notice').addChannelOption(o => o.setName('target_channel').setDescription('Channel').setRequired(true)).addStringOption(o => o.setName('content').setDescription('Body').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+  new SlashCommandBuilder().setName('update').setDescription('Broadcasts update').addChannelOption(o => o.setName('target_channel').setDescription('Channel').setRequired(true)).addStringOption(o => o.setName('message').setDescription('Details').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+  new SlashCommandBuilder().setName('poll').setDescription('Voting ballot').addStringOption(o => o.setName('query').setDescription('Topic').setRequired(true)).addStringOption(o => o.setName('choice_a').setDescription('Choice A').setRequired(true)).addStringOption(o => o.setName('choice_b').setDescription('Choice B').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+  new SlashCommandBuilder().setName('giveaway').setDescription('Prize giveaway').addStringOption(o => o.setName('item').setDescription('Prize').setRequired(true)).addIntegerOption(o => o.setName('slot_count').setDescription('Winners').setRequired(true)).addIntegerOption(o => o.setName('length_mins').setDescription('Minutes').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+  new SlashCommandBuilder().setName('coinflip').setDescription('Flips a coin').setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
+  new SlashCommandBuilder().setName('invites').setDescription('Check server invite leaderboard').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
+  new SlashCommandBuilder().setName('ticketpanel').setDescription('Sends the support ticket panel').addChannelOption(o => o.setName('target_channel').setDescription('Channel to send panel').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+  new SlashCommandBuilder().setName('rank').setDescription('Checks level and XP').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
+  new SlashCommandBuilder().setName('leaderboard').setDescription('Top members leaderboard').setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
+  new SlashCommandBuilder().setName('setrank').setDescription('Admin rank set').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(true)).addIntegerOption(o => o.setName('level').setDescription('Level').setRequired(true)).addIntegerOption(o => o.setName('xp').setDescription('XP').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  new SlashCommandBuilder().setName('removerank').setDescription('Reset rank').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  new SlashCommandBuilder().setName('givexp').setDescription('Add XP').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(true)).addIntegerOption(o => o.setName('amount').setDescription('Amount').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  new SlashCommandBuilder().setName('givelvl').setDescription('Add levels').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(true)).addIntegerOption(o => o.setName('number_of_level').setDescription('Levels').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  new SlashCommandBuilder().setName('dm').setDescription('Send DM').addUserOption(o => o.setName('recipient').setDescription('User').setRequired(true)).addStringOption(o => o.setName('msg').setDescription('Text').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  new SlashCommandBuilder().setName('dmid').setDescription('Send DM by ID').addStringOption(o => o.setName('account_id').setDescription('ID').setRequired(true)).addStringOption(o => o.setName('msg').setDescription('Text').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  new SlashCommandBuilder().setName('giverole').setDescription('Give role').addUserOption(o => o.setName('member').setDescription('User').setRequired(true)).addRoleOption(o => o.setName('role_target').setDescription('Role').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
+  new SlashCommandBuilder().setName('takerole').setDescription('Take role').addUserOption(o => o.setName('member').setDescription('User').setRequired(true)).addRoleOption(o => o.setName('role_target').setDescription('Role').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
+  new SlashCommandBuilder().setName('ban').setDescription('Ban member').addUserOption(o => o.setName('violator').setDescription('User').setRequired(true)).addStringOption(o => o.setName('justification').setDescription('Reason').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+  new SlashCommandBuilder().setName('unban').setDescription('Unban member').addStringOption(o => o.setName('account_id').setDescription('ID').setRequired(true)).addStringOption(o => o.setName('justification').setDescription('Reason').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+  new SlashCommandBuilder().setName('kick').setDescription('Kick member').addUserOption(o => o.setName('violator').setDescription('User').setRequired(true)).addStringOption(o => o.setName('justification').setDescription('Reason').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
+  new SlashCommandBuilder().setName('warn').setDescription('Warn member').addUserOption(o => o.setName('violator').setDescription('User').setRequired(true)).addStringOption(o => o.setName('justification').setDescription('Reason').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+  new SlashCommandBuilder().setName('timeout').setDescription('Timeout member').addUserOption(o => o.setName('violator').setDescription('User').setRequired(true)).addIntegerOption(o => o.setName('mins').setDescription('Mins').setRequired(true)).addStringOption(o => o.setName('justification').setDescription('Reason').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+  new SlashCommandBuilder().setName('serverinfo').setDescription('Server details').setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
+  new SlashCommandBuilder().setName('userinfo').setDescription('User profile details').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.SendMessages)
 ].map(command => command.toJSON());
 
 function getXpRequiredForLevel(level) {
@@ -95,7 +98,6 @@ async function verifyAndAssignRole(guild, member, targetLevel) {
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
   
-  // Cache all existing invites
   for (const [guildId, guild] of client.guilds.cache) {
     try {
       const firstInvites = await guild.invites.fetch();
@@ -115,7 +117,6 @@ client.once('ready', async () => {
   }
 });
 
-// --- TRACK NEW INVITES CREATED ---
 client.on('inviteCreate', invite => {
   const cachedInvites = guildInvites.get(invite.guild.id);
   if (cachedInvites) {
@@ -125,7 +126,6 @@ client.on('inviteCreate', invite => {
   }
 });
 
-// --- TRACK DELETED INVITES ---
 client.on('inviteDelete', invite => {
   const cachedInvites = guildInvites.get(invite.guild.id);
   if (cachedInvites) {
@@ -133,7 +133,6 @@ client.on('inviteDelete', invite => {
   }
 });
 
-// --- TRACK MEMBER JOINS & PERSIST INVITE DATA VIA FIREBASE ---
 client.on('guildMemberAdd', async member => {
   try {
     const welcomeChannelId = '1530563856466968576';
@@ -217,7 +216,6 @@ client.on('messageCreate', async message => {
     return;
   }
 
-  // --- LEVELING & XP SYSTEM ---
   const userId = message.author.id;
   const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Levels/${userId}.json`;
 
@@ -269,6 +267,14 @@ client.on('messageCreate', async message => {
 });
 
 client.on('interactionCreate', async interaction => {
+  // --- ROLE RESTRICTION CHECK FOR ALL INTERACTIONS ---
+  if (interaction.guild) {
+    const member = interaction.member || await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+    if (!member || !member.roles.cache.has(ALLOWED_ROLE_ID)) {
+      return interaction.reply({ content: '❌ You do not have permission to use this bot.', ephemeral: true });
+    }
+  }
+
   if (interaction.isButton()) {
     const customId = interaction.customId;
 
@@ -397,7 +403,7 @@ client.on('interactionCreate', async interaction => {
     const embed = new EmbedBuilder()
       .setColor('#3498db')
       .setTitle('❓ Support')
-      .setDescription('Do you have any questions regarding the server or game?\nCreate a ticket here and our moderators will help you!\n\nPlease keep in mind that creating joke tickets is against the rules.')
+      .setDescription('Do you have any questions regarding the server or game?\nCreate a ticket here and our moderators will help you!\n\nPlease keep in main that creating joke tickets is against the rules.')
       .setFooter({ text: "Khaby's Utilities" });
 
     const row = new ActionRowBuilder().addComponents(
