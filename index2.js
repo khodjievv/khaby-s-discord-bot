@@ -116,7 +116,7 @@ async function sendLevelUpAnnouncement(guild, user, previousLevel, newLevel) {
       iconURL: user.displayAvatarURL({ dynamic: true })
     })
     .setDescription(
-      `✨ Congratulations <@${user.id}>! You've ascended to greatness!\n\n` +
+      `✨ Congratulations <@${user.id}>! You've Gained New Level!\n\n` +
       `📈 **Progress:** \`${previousLevel}\` <a:A_Arrow:1532695026096668752> **\`${newLevel}\`**\n\n` +
       `*Keep chatting and participating to unlock higher roles and dominate the leaderboard!*`
     )
