@@ -103,7 +103,7 @@ async function verifyAndAssignRole(guild, member, targetLevel) {
   }
 }
 
-// Enhanced level-up announcement incorporating the animated custom emoji correctly
+// Level-up announcement with updated phrasing ("You've Gained Level!")
 async function sendLevelUpAnnouncement(guild, user, previousLevel, newLevel) {
   if (previousLevel >= newLevel) return;
   const levelUpChannel = guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
@@ -116,7 +116,7 @@ async function sendLevelUpAnnouncement(guild, user, previousLevel, newLevel) {
       iconURL: user.displayAvatarURL({ dynamic: true })
     })
     .setDescription(
-      `✨ Congratulations <@${user.id}>! You've Gained New Level!\n\n` +
+      `✨ Congratulations <@${user.id}>! You've Gained Level!\n\n` +
       `📈 **Progress:** \`${previousLevel}\` <a:A_Arrow:1532695026096668752> **\`${newLevel}\`**\n\n` +
       `*Keep chatting and participating to unlock higher roles and dominate the leaderboard!*`
     )
@@ -478,7 +478,7 @@ client.on('interactionCreate', async interaction => {
         userRankNum = `#${userIndex + 1}`;
       }
 
-      let listDesc = `You have invited **${userTotal}** users to this server.\nYou are currently **${userRankNum}** on the leaderboard.\n\n`;
+      let listDesc = `🏆 **Global Top Inviters:**\n`;
 
       for (let i = 0; i < Math.min(sortedInvites.length, 10); i++) {
         const rankNum = i + 1;
@@ -500,18 +500,24 @@ client.on('interactionCreate', async interaction => {
       }
 
       if (sortedInvites.length === 0) {
-        listDesc += `*No invites recorded yet.*`;
+        listDesc += `*No global invites recorded yet.*`;
       }
 
       const embed = new EmbedBuilder()
         .setColor('#3498db')
-        .setTitle('Invite Leaderboard')
-        .setDescription(listDesc)
+        .setAuthor({ name: `Global Invite Leaderboard`, iconURL: interaction.guild.iconURL({ dynamic: true }) })
+        .setDescription(
+          `📊 **Global Standing for <@${targetUser.id}>**\n` +
+          `• **Rank:** \`${userRank}\`\n` +
+          `• **Total Invites:** \`${userTotal}\`\n\n` +
+          listDesc
+        )
+        .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }))
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
     } catch (e) {
-      await interaction.reply({ content: '❌ Could not load invite leaderboard.', ephemeral: true });
+      await interaction.reply({ content: '❌ Could not load global invite leaderboard.', ephemeral: true });
     }
   }
   else if (commandName === 'poll') {
@@ -801,7 +807,7 @@ client.on('interactionCreate', async interaction => {
       await sendLevelUpAnnouncement(interaction.guild, targetUser, previousLevel, userData.level);
     }
 
-    await interaction.reply({ content: `✅ Added **${levels_to_add} levels** to **${targetUser.tag}**. Current Level: **${userData.level}**`, ephemeral: true });
+    await interaction.reply({ content: `✅ Added **${levelsToAdd} levels** to **${targetUser.tag}**. Current Level: **${userData.level}**`, ephemeral: true });
   }
   else if (['ban', 'unban', 'kick', 'warn', 'timeout', 'giverole', 'takerole', 'dm', 'dmid'].includes(commandName)) {
     await interaction.reply({ content: `✅ Command executed successfully.`, ephemeral: true });
