@@ -801,7 +801,7 @@ client.on('interactionCreate', async interaction => {
       await sendLevelUpAnnouncement(interaction.guild, targetUser, previousLevel, userData.level);
     }
 
-    await interaction.reply({ content: `✅ Added **${levelsToAdd} levels** to **${targetUser.tag}**. Current Level: **${userData.level}**`, ephemeral: true });
+    await interaction.reply({ content: `✅ Added **${levels_to_add} levels** to **${targetUser.tag}**. Current Level: **${userData.level}**`, ephemeral: true });
   }
   else if (['ban', 'unban', 'kick', 'warn', 'timeout', 'giverole', 'takerole', 'dm', 'dmid'].includes(commandName)) {
     await interaction.reply({ content: `✅ Command executed successfully.`, ephemeral: true });
