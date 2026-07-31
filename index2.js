@@ -103,19 +103,26 @@ async function verifyAndAssignRole(guild, member, targetLevel) {
   }
 }
 
-// Helper function to send level-up announcements cleanly from any trigger
+// Enhanced, stylish level-up announcement incorporating the :A_Arrow: emoji
 async function sendLevelUpAnnouncement(guild, user, previousLevel, newLevel) {
   if (previousLevel >= newLevel) return;
   const levelUpChannel = guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
   if (!levelUpChannel) return;
 
   const levelEmbed = new EmbedBuilder()
-    .setColor('#2b2d31')
+    .setColor('#5865F2')
     .setAuthor({
-      name: `Level-up!`,
+      name: `🎉 LEVEL UP! 🎉`,
       iconURL: user.displayAvatarURL({ dynamic: true })
     })
-    .setDescription(`<@${user.id}> • **${previousLevel}** • **${newLevel}**`);
+    .setDescription(
+      `✨ Congratulations <@${user.id}>! You've ascended to greatness!\n\n` +
+      `📈 **Progress:** \`${previousLevel}\` <:A_Arrow:1340000000000000000> **\`${newLevel}\`**\n\n` +
+      `*Keep chatting and participating to unlock higher roles and dominate the leaderboard!*`
+    )
+    .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
+    .setFooter({ text: `Khaby's Utilities • Level Progression`, iconURL: guild.iconURL({ dynamic: true }) })
+    .setTimestamp();
 
   try {
     await levelUpChannel.send({ embeds: [levelEmbed] });
