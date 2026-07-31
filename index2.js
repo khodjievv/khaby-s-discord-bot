@@ -53,7 +53,7 @@ const commands = [
   new SlashCommandBuilder().setName('poll').setDescription('Voting ballot').addStringOption(o => o.setName('query').setDescription('Topic').setRequired(true)).addStringOption(o => o.setName('choice_a').setDescription('Choice A').setRequired(true)).addStringOption(o => o.setName('choice_b').setDescription('Choice B').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
   new SlashCommandBuilder().setName('giveaway').setDescription('Prize giveaway').addStringOption(o => o.setName('item').setDescription('Prize').setRequired(true)).addIntegerOption(o => o.setName('slot_count').setDescription('Winners').setRequired(true)).addIntegerOption(o => o.setName('length_mins').setDescription('Minutes').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
   new SlashCommandBuilder().setName('coinflip').setDescription('Flips a coin').setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
-  new SlashCommandBuilder().setName('invites').setDescription('Check server invite leaderboard').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
+  new SlashCommandBuilder().setName('invites').setDescription('Check global server invite leaderboard').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
   new SlashCommandBuilder().setName('ticketpanel').setDescription('Sends the support ticket panel').addChannelOption(o => o.setName('target_channel').setDescription('Channel to send panel').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
   new SlashCommandBuilder().setName('lvlboard').setDescription('Global level and ranking board').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
   new SlashCommandBuilder().setName('leaderboard').setDescription('Top members leaderboard').setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
@@ -103,7 +103,7 @@ async function verifyAndAssignRole(guild, member, targetLevel) {
   }
 }
 
-// Enhanced, stylish level-up announcement incorporating the animated custom emoji correctly
+// Enhanced level-up announcement incorporating the animated custom emoji correctly
 async function sendLevelUpAnnouncement(guild, user, previousLevel, newLevel) {
   if (previousLevel >= newLevel) return;
   const levelUpChannel = guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
@@ -116,7 +116,7 @@ async function sendLevelUpAnnouncement(guild, user, previousLevel, newLevel) {
       iconURL: user.displayAvatarURL({ dynamic: true })
     })
     .setDescription(
-      `✨ Congratulations <@${user.id}>! You've gained a new level!\n\n` +
+      `✨ Congratulations <@${user.id}>! You've ascended to greatness!\n\n` +
       `📈 **Progress:** \`${previousLevel}\` <a:A_Arrow:1532695026096668752> **\`${newLevel}\`**\n\n` +
       `*Keep chatting and participating to unlock higher roles and dominate the leaderboard!*`
     )
@@ -195,7 +195,8 @@ client.on('guildMemberAdd', async member => {
       inviterText = `invitation by **@${usedInvite.inviter.username}**`;
       
       const inviterId = usedInvite.inviter.id;
-      const inviteRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Invites/${member.guild.id}/${inviterId}.json`;
+      // Storing globally under /Invites/{inviterId}.json so invites sync across all servers the bot is in
+      const inviteRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Invites/${inviterId}.json`;
       
       try {
         const res = await fetch(inviteRef);
@@ -203,7 +204,7 @@ client.on('guildMemberAdd', async member => {
         
         inviteData.regular += 1;
         inviteData.total += 1;
-        inviteData.history.push({ invitedUserId: member.id, code: usedInvite.code, timestamp: Date.now() });
+        inviteData.history.push({ invitedUserId: member.id, guildId: member.guild.id, code: usedInvite.code, timestamp: Date.now() });
 
         await fetch(inviteRef, {
           method: 'PUT',
@@ -211,7 +212,7 @@ client.on('guildMemberAdd', async member => {
           body: JSON.stringify(inviteData)
         });
       } catch (dbErr) {
-        console.error('Database invite update error:', dbErr);
+        console.error('Database global invite update error:', dbErr);
       }
     }
 
@@ -462,7 +463,7 @@ client.on('interactionCreate', async interaction => {
     const targetUser = interaction.options.getUser('target_user') || interaction.user;
     
     try {
-      const res = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/Invites/${interaction.guild.id}.json`);
+      const res = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/Invites.json`);
       const allInvites = await res.json() || {};
 
       const sortedInvites = Object.entries(allInvites)
@@ -478,7 +479,10 @@ client.on('interactionCreate', async interaction => {
         userRank = `#${userIndex + 1}`;
       }
 
-      let listDesc = `You have invited **${userTotal}** users to this server.\nYou are currently **${userRank}** on the leaderboard.\n\n`;
+      let listDesc = `🌍 **Global Standing for <@${targetUser.id}>**\n`;
+      listDesc += `• **Total Invites:** \`${userTotal}\`\n`;
+      listDesc += `• **Global Rank:** \`${userRank}\`\n\n`;
+      listDesc += `🏆 **Global Top Inviters:**\n`;
 
       for (let i = 0; i < Math.min(sortedInvites.length, 10); i++) {
         const rankNum = i + 1;
@@ -492,26 +496,26 @@ client.on('interactionCreate', async interaction => {
         const inviteWord = entry.total === 1 ? 'invite' : 'invites';
         
         let prefix = `${rankNum}.`;
-        if (rankNum === 1) prefix = '🥇';
-        else if (rankNum === 2) prefix = '🥈';
-        else if (rankNum === 3) prefix = '🥉';
+        if (rankNum === 1) prefix = '<a:first_place:1532695027589980181>';
+        else if (rankNum === 2) prefix = '<a:second_place:1532695029146112020>';
+        else if (rankNum === 3) prefix = '<a:third_place:1532695030702161962>';
 
         listDesc += `${prefix} ${userDisplay} — **${entry.total}** ${inviteWord}\n`;
       }
 
       if (sortedInvites.length === 0) {
-        listDesc += `*No invites recorded yet.*`;
+        listDesc += `*No global invites recorded yet.*`;
       }
 
       const embed = new EmbedBuilder()
         .setColor('#3498db')
-        .setTitle('Invite Leaderboard')
+        .setTitle('🌐 Global Invite Leaderboard')
         .setDescription(listDesc)
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
     } catch (e) {
-      await interaction.reply({ content: '❌ Could not load invite leaderboard.', ephemeral: true });
+      await interaction.reply({ content: '❌ Could not load global invite leaderboard.', ephemeral: true });
     }
   }
   else if (commandName === 'poll') {
@@ -620,9 +624,9 @@ client.on('interactionCreate', async interaction => {
         } catch (e) {}
 
         let prefix = `${rankNum}.`;
-        if (rankNum === 1) prefix = '🥇';
-        else if (rankNum === 2) prefix = '🥈';
-        else if (rankNum === 3) prefix = '🥉';
+        if (rankNum === 1) prefix = '<a:first_place:1532695027589980181>';
+        else if (rankNum === 2) prefix = '<a:second_place:1532695029146112020>';
+        else if (rankNum === 3) prefix = '<a:third_place:1532695030702161962>';
 
         listDesc += `${prefix} **@${tag}** — Level **${entry.level}** (\`${entry.xp} XP\`)\n`;
       }
@@ -662,9 +666,9 @@ client.on('interactionCreate', async interaction => {
       } catch(e){}
       
       let prefix = `${i + 1}.`;
-      if (i === 0) prefix = '🥇';
-      else if (i === 1) prefix = '🥈';
-      else if (i === 2) prefix = '🥉';
+      if (i === 0) prefix = '<a:first_place:1532695027589980181>';
+      else if (i === 1) prefix = '<a:second_place:1532695029146112020>';
+      else if (i === 2) prefix = '<a:third_place:1532695030702161962>';
 
       desc += `${prefix} **@${tag}** — Level **${sorted[i].level}** (\`${sorted[i].xp} XP\`)\n`;
     }
