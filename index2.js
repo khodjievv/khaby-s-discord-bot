@@ -55,7 +55,7 @@ const commands = [
   new SlashCommandBuilder().setName('coinflip').setDescription('Flips a coin').setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
   new SlashCommandBuilder().setName('invites').setDescription('Check server invite leaderboard').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
   new SlashCommandBuilder().setName('ticketpanel').setDescription('Sends the support ticket panel').addChannelOption(o => o.setName('target_channel').setDescription('Channel to send panel').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
-  new SlashCommandBuilder().setName('rank').setDescription('Checks level and XP').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
+  new SlashCommandBuilder().setName('lvlboard').setDescription('Global level and ranking board').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
   new SlashCommandBuilder().setName('leaderboard').setDescription('Top members leaderboard').setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
   new SlashCommandBuilder().setName('setrank').setDescription('Admin rank set').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(true)).addIntegerOption(o => o.setName('level').setDescription('Level (Max 20)').setRequired(true)).addIntegerOption(o => o.setName('xp').setDescription('XP').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder().setName('removerank').setDescription('Reset rank').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -103,7 +103,7 @@ async function verifyAndAssignRole(guild, member, targetLevel) {
   }
 }
 
-// Enhanced, stylish level-up announcement incorporating the :A_Arrow: emoji
+// Enhanced, stylish level-up announcement incorporating the animated custom emoji correctly
 async function sendLevelUpAnnouncement(guild, user, previousLevel, newLevel) {
   if (previousLevel >= newLevel) return;
   const levelUpChannel = guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
@@ -116,8 +116,8 @@ async function sendLevelUpAnnouncement(guild, user, previousLevel, newLevel) {
       iconURL: user.displayAvatarURL({ dynamic: true })
     })
     .setDescription(
-      `✨ Congratulations <@${user.id}>! You've ascended to greatness!\n\n` +
-      `📈 **Progress:** \`${previousLevel}\` <:A_Arrow:1340000000000000000> **\`${newLevel}\`**\n\n` +
+      `✨ Congratulations <@${user.id}>! You've gained a new level!\n\n` +
+      `📈 **Progress:** \`${previousLevel}\` <a:A_Arrow:1532695026096668752> **\`${newLevel}\`**\n\n` +
       `*Keep chatting and participating to unlock higher roles and dominate the leaderboard!*`
     )
     .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
@@ -572,25 +572,76 @@ client.on('interactionCreate', async interaction => {
   else if (commandName === 'coinflip') {
     await interaction.reply({ content: `Coin landed on: **${Math.random() < 0.5 ? 'Heads 🪙' : 'Tails 🪙'}**` });
   }
-  else if (commandName === 'rank') {
+  else if (commandName === 'lvlboard') {
     const targetUser = interaction.options.getUser('target_user') || interaction.user;
-    const res = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/Levels/${targetUser.id}.json`);
-    const data = await res.json() || { xp: 0, level: 1 };
     
-    const currentLevel = data.level || 1;
-    const currentXp = data.xp || 0;
-    const requiredXp = currentLevel >= 20 ? 'MAX' : getXpRequiredForLevel(currentLevel);
+    try {
+      const res = await fetch('https://donate-modded-2b27d-default-rtdb.firebaseio.com/Levels.json');
+      const allData = await res.json() || {};
 
-    const rankEmbed = new EmbedBuilder()
-      .setColor('#3498db')
-      .setTitle(`📊 Rank Card — ${targetUser.username}`)
-      .addFields(
-        { name: 'Level', value: `${currentLevel} / 20`, inline: true },
-        { name: 'XP', value: `${currentXp} / ${requiredXp}`, inline: true }
-      )
-      .setTimestamp();
+      const sorted = Object.entries(allData)
+        .map(([id, info]) => ({ id, level: info.level || 1, xp: info.xp || 0 }))
+        .sort((a, b) => b.level - a.level || b.xp - a.xp);
 
-    await interaction.reply({ embeds: [rankEmbed] });
+      let userRank = 'Unranked';
+      let userLevel = 1;
+      let userXp = 0;
+
+      const userIndex = sorted.findIndex(item => item.id === targetUser.id);
+      if (userIndex !== -1) {
+        userRank = `#${userIndex + 1}`;
+        userLevel = sorted[userIndex].level;
+        userXp = sorted[userIndex].xp;
+      } else {
+        const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Levels/${targetUser.id}.json`;
+        const userRes = await fetch(userRef);
+        const userData = await userRes.json();
+        if (userData) {
+          userLevel = userData.level || 1;
+          userXp = userData.xp || 0;
+        }
+      }
+
+      const requiredXp = userLevel >= 20 ? 'MAX' : getXpRequiredForLevel(userLevel);
+
+      let listDesc = `📊 **Global Standing for <@${targetUser.id}>**\n`;
+      listDesc += `• **Rank:** \`${userRank}\`\n`;
+      listDesc += `• **Level:** \`${userLevel} / 20\`\n`;
+      listDesc += `• **XP:** \`${userXp} / ${requiredXp}\`\n\n`;
+      listDesc += `🏆 **Global Top Members:**\n`;
+
+      for (let i = 0; i < Math.min(sorted.length, 10); i++) {
+        const rankNum = i + 1;
+        const entry = sorted[i];
+        let tag = entry.id;
+        try {
+          const u = await client.users.fetch(entry.id);
+          tag = u.username;
+        } catch (e) {}
+
+        let prefix = `${rankNum}.`;
+        if (rankNum === 1) prefix = '🥇';
+        else if (rankNum === 2) prefix = '🥈';
+        else if (rankNum === 3) prefix = '🥉';
+
+        listDesc += `${prefix} **@${tag}** — Level **${entry.level}** (\`${entry.xp} XP\`)\n`;
+      }
+
+      if (sorted.length === 0) {
+        listDesc += `*No global rankings recorded yet.*`;
+      }
+
+      const rankEmbed = new EmbedBuilder()
+        .setColor('#3498db')
+        .setTitle(`🌐 Global Level & Leaderboard`)
+        .setDescription(listDesc)
+        .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }))
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [rankEmbed] });
+    } catch (e) {
+      await interaction.reply({ content: '❌ Could not load global level board.', ephemeral: true });
+    }
   }
   else if (commandName === 'leaderboard') {
     const res = await fetch('https://donate-modded-2b27d-default-rtdb.firebaseio.com/Levels.json');
@@ -637,7 +688,6 @@ client.on('interactionCreate', async interaction => {
 
     const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Levels/${targetUser.id}.json`;
     
-    // Fetch old data to determine previous level for announcement
     const oldRes = await fetch(userRef);
     const oldData = await oldRes.json() || { level: 1 };
     const previousLevel = oldData.level || 1;
