@@ -53,7 +53,7 @@ const commands = [
   new SlashCommandBuilder().setName('poll').setDescription('Voting ballot').addStringOption(o => o.setName('query').setDescription('Topic').setRequired(true)).addStringOption(o => o.setName('choice_a').setDescription('Choice A').setRequired(true)).addStringOption(o => o.setName('choice_b').setDescription('Choice B').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
   new SlashCommandBuilder().setName('giveaway').setDescription('Prize giveaway').addStringOption(o => o.setName('item').setDescription('Prize').setRequired(true)).addIntegerOption(o => o.setName('slot_count').setDescription('Winners').setRequired(true)).addIntegerOption(o => o.setName('length_mins').setDescription('Minutes').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
   new SlashCommandBuilder().setName('coinflip').setDescription('Flips a coin').setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
-  new SlashCommandBuilder().setName('invites').setDescription('Check global server invite leaderboard').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
+  new SlashCommandBuilder().setName('invites').setDescription('Check server invite leaderboard').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
   new SlashCommandBuilder().setName('ticketpanel').setDescription('Sends the support ticket panel').addChannelOption(o => o.setName('target_channel').setDescription('Channel to send panel').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
   new SlashCommandBuilder().setName('lvlboard').setDescription('Global level and ranking board').addUserOption(o => o.setName('target_user').setDescription('User').setRequired(false)).setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
   new SlashCommandBuilder().setName('leaderboard').setDescription('Top members leaderboard').setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
@@ -195,7 +195,6 @@ client.on('guildMemberAdd', async member => {
       inviterText = `invitation by **@${usedInvite.inviter.username}**`;
       
       const inviterId = usedInvite.inviter.id;
-      // Storing globally under /Invites/{inviterId}.json so invites sync across all servers the bot is in
       const inviteRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Invites/${inviterId}.json`;
       
       try {
@@ -471,18 +470,15 @@ client.on('interactionCreate', async interaction => {
         .sort((a, b) => b.total - a.total);
 
       let userTotal = 0;
-      let userRank = 'Unranked';
+      let userRankNum = 'Unranked';
 
       const userIndex = sortedInvites.findIndex(item => item.userId === targetUser.id);
       if (userIndex !== -1) {
         userTotal = sortedInvites[userIndex].total;
-        userRank = `#${userIndex + 1}`;
+        userRankNum = `#${userIndex + 1}`;
       }
 
-      let listDesc = `🌍 **Global Standing for <@${targetUser.id}>**\n`;
-      listDesc += `• **Total Invites:** \`${userTotal}\`\n`;
-      listDesc += `• **Global Rank:** \`${userRank}\`\n\n`;
-      listDesc += `🏆 **Global Top Inviters:**\n`;
+      let listDesc = `You have invited **${userTotal}** users to this server.\nYou are currently **${userRankNum}** on the leaderboard.\n\n`;
 
       for (let i = 0; i < Math.min(sortedInvites.length, 10); i++) {
         const rankNum = i + 1;
@@ -504,18 +500,18 @@ client.on('interactionCreate', async interaction => {
       }
 
       if (sortedInvites.length === 0) {
-        listDesc += `*No global invites recorded yet.*`;
+        listDesc += `*No invites recorded yet.*`;
       }
 
       const embed = new EmbedBuilder()
         .setColor('#3498db')
-        .setTitle('🌐 Global Invite Leaderboard')
+        .setTitle('Invite Leaderboard')
         .setDescription(listDesc)
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
     } catch (e) {
-      await interaction.reply({ content: '❌ Could not load global invite leaderboard.', ephemeral: true });
+      await interaction.reply({ content: '❌ Could not load invite leaderboard.', ephemeral: true });
     }
   }
   else if (commandName === 'poll') {
