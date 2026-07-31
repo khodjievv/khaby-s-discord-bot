@@ -103,6 +103,27 @@ async function verifyAndAssignRole(guild, member, targetLevel) {
   }
 }
 
+// Helper function to send level-up announcements cleanly from any trigger
+async function sendLevelUpAnnouncement(guild, user, previousLevel, newLevel) {
+  if (previousLevel >= newLevel) return;
+  const levelUpChannel = guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
+  if (!levelUpChannel) return;
+
+  const levelEmbed = new EmbedBuilder()
+    .setColor('#2b2d31')
+    .setAuthor({
+      name: `Level-up!`,
+      iconURL: user.displayAvatarURL({ dynamic: true })
+    })
+    .setDescription(`<@${user.id}> • **${previousLevel}** • **${newLevel}**`);
+
+  try {
+    await levelUpChannel.send({ embeds: [levelEmbed] });
+  } catch (err) {
+    console.error('Failed to send level-up announcement:', err);
+  }
+}
+
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
   
@@ -272,19 +293,7 @@ client.on('messageCreate', async message => {
 
       if (leveledUp) {
         await verifyAndAssignRole(message.guild, message.member, userData.level);
-        
-        const levelUpChannel = message.guild.channels.cache.get(LEVEL_UP_CHANNEL_ID);
-        if (levelUpChannel) {
-          const levelEmbed = new EmbedBuilder()
-            .setColor('#2b2d31')
-            .setAuthor({
-              name: `Level-up!`,
-              iconURL: message.author.displayAvatarURL({ dynamic: true })
-            })
-            .setDescription(`${message.author} • **${previousLevel}** • **${userData.level}**`);
-
-          await levelUpChannel.send({ embeds: [levelEmbed] });
-        }
+        await sendLevelUpAnnouncement(message.guild, message.author, previousLevel, userData.level);
       }
     }
   } catch (err) {
@@ -620,6 +629,12 @@ client.on('interactionCreate', async interaction => {
     if (level === 20) xp = 0;
 
     const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Levels/${targetUser.id}.json`;
+    
+    // Fetch old data to determine previous level for announcement
+    const oldRes = await fetch(userRef);
+    const oldData = await oldRes.json() || { level: 1 };
+    const previousLevel = oldData.level || 1;
+
     await fetch(userRef, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -629,6 +644,10 @@ client.on('interactionCreate', async interaction => {
     const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
     if (targetMember) {
       await verifyAndAssignRole(interaction.guild, targetMember, level);
+    }
+
+    if (level > previousLevel) {
+      await sendLevelUpAnnouncement(interaction.guild, targetUser, previousLevel, level);
     }
 
     await interaction.reply({ content: `✅ Successfully set **${targetUser.tag}** to Level **${level}** with **${xp} XP** and updated their roles!`, ephemeral: true });
@@ -661,6 +680,8 @@ client.on('interactionCreate', async interaction => {
     if (!userData.level) userData.level = 1;
     if (!userData.xp) userData.xp = 0;
 
+    let previousLevel = userData.level;
+
     if (userData.level < 20) {
       userData.xp += amount;
       let xpNeeded = getXpRequiredForLevel(userData.level);
@@ -686,6 +707,10 @@ client.on('interactionCreate', async interaction => {
       if (targetMember) {
         await verifyAndAssignRole(interaction.guild, targetMember, userData.level);
       }
+
+      if (userData.level > previousLevel) {
+        await sendLevelUpAnnouncement(interaction.guild, targetUser, previousLevel, userData.level);
+      }
     }
 
     await interaction.reply({ content: `✅ Added **${amount} XP** to **${targetUser.tag}**. Current Level: **${userData.level}**`, ephemeral: true });
@@ -700,6 +725,7 @@ client.on('interactionCreate', async interaction => {
 
     if (!userData.level) userData.level = 1;
     
+    let previousLevel = userData.level;
     userData.level = Math.min(20, userData.level + levelsToAdd);
     if (userData.level === 20) userData.xp = 0;
 
@@ -712,6 +738,10 @@ client.on('interactionCreate', async interaction => {
     const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
     if (targetMember) {
       await verifyAndAssignRole(interaction.guild, targetMember, userData.level);
+    }
+
+    if (userData.level > previousLevel) {
+      await sendLevelUpAnnouncement(interaction.guild, targetUser, previousLevel, userData.level);
     }
 
     await interaction.reply({ content: `✅ Added **${levelsToAdd} levels** to **${targetUser.tag}**. Current Level: **${userData.level}**`, ephemeral: true });
