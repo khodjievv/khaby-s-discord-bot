@@ -76,31 +76,26 @@ const commands = [
 
 function getXpRequiredForLevel(level) {
   if (level >= 20) return Infinity; 
-  // Steeper exponential scaling formula to make leveling up significantly harder
   return Math.floor(250 * Math.pow(level, 2.1));
 }
 
 async function verifyAndAssignRole(guild, member, targetLevel) {
   if (!member) return;
   
-  // Iterate through all level roles from 1 to 20
   for (let i = 1; i <= 20; i++) {
     const roleName = `Level ${i}`;
     let role = guild.roles.cache.find(r => r.name === roleName);
     
     if (i === targetLevel) {
-      // Create the target role automatically if it doesn't exist yet in the server
       if (!role) {
         try {
           role = await guild.roles.create({ name: roleName, color: '#3498db', reason: 'Automated Level Reward' });
         } catch (e) { continue; }
       }
-      // Assign the exact current level role if the member doesn't have it
       if (role && !member.roles.cache.has(role.id)) {
         try { await member.roles.add(role); } catch (e) {}
       }
     } else {
-      // Strip out any outdated lower or higher level roles
       if (role && member.roles.cache.has(role.id)) {
         try { await member.roles.remove(role); } catch (e) {}
       }
@@ -229,7 +224,6 @@ client.on('messageCreate', async message => {
     return;
   }
 
-  // 60-second cooldown per user to prevent XP spamming
   const userId = message.author.id;
   const now = Date.now();
   if (xpCooldowns.has(userId) && now - xpCooldowns.get(userId) < 60000) return;
@@ -249,7 +243,6 @@ client.on('messageCreate', async message => {
 
     if (userData.level < 20) {
       const textLength = message.content.trim().length;
-      // Lowered message XP gains to match the harder leveling curve
       const earnedXp = Math.min(Math.max(Math.floor(textLength / 10), 2), 15);
 
       userData.xp += earnedXp;
@@ -300,7 +293,6 @@ client.on('messageCreate', async message => {
 });
 
 client.on('interactionCreate', async interaction => {
-  // --- ROLE RESTRICTION CHECK FOR ALL INTERACTIONS ---
   if (interaction.guild) {
     const member = interaction.member || await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
     if (!member || !member.roles.cache.has(ALLOWED_ROLE_ID)) {
@@ -681,7 +673,7 @@ client.on('interactionCreate', async interaction => {
 
       if (userData.level >= 20) {
         userData.level = 20;
-        userData.xp = `0`;
+        userData.xp = 0;
       }
 
       await fetch(userRef, {
@@ -722,7 +714,7 @@ client.on('interactionCreate', async interaction => {
       await verifyAndAssignRole(interaction.guild, targetMember, userData.level);
     }
 
-    await interaction.-reply({ content: `✅ Added **${levelsToAdd} levels** to **${targetUser.tag}**. Current Level: **${userData.level}**`, ephemeral: true });
+    await interaction.reply({ content: `✅ Added **${levelsToAdd} levels** to **${targetUser.tag}**. Current Level: **${userData.level}**`, ephemeral: true });
   }
   else if (['ban', 'unban', 'kick', 'warn', 'timeout', 'giverole', 'takerole', 'dm', 'dmid'].includes(commandName)) {
     await interaction.reply({ content: `✅ Command executed successfully.`, ephemeral: true });
